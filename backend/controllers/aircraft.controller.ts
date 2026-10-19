@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import * as aircraftService from '../services/aircraft.service.ts';
+import * as flightDetailsService from '../services/flightDetails.service.ts';
 
 // Express 5 envía al errorHandler cualquier error de una función async, sin try/catch
 export async function listAircraft(req: Request, res: Response): Promise<void> {
@@ -10,4 +11,14 @@ export async function listAircraft(req: Request, res: Response): Promise<void> {
 export async function getAircraft(req: Request<{ icao24: string }>, res: Response): Promise<void> {
   const aircraft = await aircraftService.getAircraftByIcao24(req.params.icao24, req.log);
   res.json(aircraft);
+}
+
+// Panel del avión seleccionado: datos en vivo + avión + ruta + progreso (sin gastar AeroDataBox)
+export async function getAircraftDetails(req: Request<{ icao24: string }>, res: Response): Promise<void> {
+  res.json(await flightDetailsService.getDetails(req.params.icao24, req.log));
+}
+
+// Horarios bajo demanda: es la única ruta que consume unidades de AeroDataBox
+export async function getAircraftSchedule(req: Request<{ icao24: string }>, res: Response): Promise<void> {
+  res.json(await flightDetailsService.getSchedule(req.params.icao24, req.log));
 }

@@ -16,6 +16,10 @@ export function getUsAircraft(log: Logger): Promise<AircraftSnapshot> {
 }
 
 export async function getAircraftByIcao24(icao24: string, log: Logger): Promise<AircraftState> {
+  // Primero la lista de EE. UU. (ya en caché por el mapa): seleccionar un avión no gasta créditos
+  const fromMap = (await getUsAircraft(log)).aircraft.find((a) => a.icao24 === icao24);
+  if (fromMap) return fromMap;
+
   const aircraft = await singleCache.getOrLoad(icao24, () => openSky.fetchByIcao24(icao24), log);
   if (!aircraft) {
     throw new AppError(404, 'AIRCRAFT_NOT_FOUND', `No hay posición para el avión ${icao24}`);
