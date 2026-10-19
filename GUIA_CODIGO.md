@@ -73,7 +73,7 @@ Las respuestas y los errores vuelven por el mismo camino. Los errores terminan e
 | `CORS_ORIGIN` | Qué orígenes (frontends) pueden llamar a la API. Es la única obligatoria. |
 | `DATABASE_URL` | Conexión a PostgreSQL. Hoy no se usa; se usará con Prisma. |
 | `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` | Credenciales OAuth2 de OpenSky. Si faltan, se usa el modo anónimo. |
-| `OPENSKY_CACHE_TTL_MS` | Cuánto dura un dato en la caché (mínimo 10000 ms). |
+| `OPENSKY_CACHE_TTL_MS` | Cuánto dura un dato en la caché (mínimo y por defecto 10000 ms; la plantilla trae 30000). |
 | `LOG_LEVEL` | Qué tan detallados son los logs. |
 | `USE_FIXTURE` | `true` sirve el archivo grabado en vez de llamar a OpenSky (plan B). |
 
@@ -322,7 +322,7 @@ Al cargar el archivo se escribe el log `"OpenSky provider mode"` con el modo: `f
 
 ### `backend/utils/AppError.ts`
 **Para qué existe:** representa errores "esperados" que se pueden mostrar al cliente, con su código HTTP.
-**Dónde encaja:** lo lanzan el validador, el service, el provider, `notFound` y el rate limiter, y lo atrapa `errorHandler`.
+**Dónde encaja:** lo lanzan el middleware `validate.ts`, el service, el provider, `notFound` y el rate limiter, y lo atrapa `errorHandler`.
 
 | Elemento | Recibe | Qué hace |
 |---|---|---|
@@ -378,10 +378,10 @@ Seguimos un avión desde OpenSky hasta el JSON que recibe el cliente con `GET /a
    - **Cache miss:** ejecuta `openSky.fetchByBox(US_BOX)`.
 9. **`fetchByBox`** llama a **`fetchRawByBox`** → **`requestStates`** con la caja. Si `USE_FIXTURE=true`, lee el archivo y salta al paso 11.
 10. **`requestStates`**:
-    1. **`getToken`** devuelve un token OAuth2 (el guardado o uno nuevo).
-    2. Axios llama a `https://opensky-network.org/api/states/all?lamin=24.5&lomin=-125&lamax=49.5&lomax=-66.9` con `Authorization: Bearer <token>`.
-    3. OpenSky responde `{ time, states: [[icao24, callsign, país, ..., lng, lat, ...], ...] }`.
-11. **`toSnapshot`** valida esa forma con Zod y pasa cada fila por **`toAircraftState`**. Por ejemplo, `["a5f852", "RTY484  ", ..., -104.46, 40.64, 2103.12, false, 66.97, 27.94, ...]` se convierte en `{ icao24: "a5f852", callsign: "RTY484", lat: 40.64, lng: -104.46, alt: 2103.12, onGround: false, spd: 66.97, hdg: 27.94, ts: ... }`. Las filas sin posición se descartan.
+    1. **`getToken`** devuelve un token OAuth2 (el guardado o uno nuevo), o `null` si no hay credenciales (modo anónimo).
+    2. Axios llama a `https://opensky-network.org/api/states/all?lamin=24.5&lomin=-125&lamax=49.5&lomax=-66.9`, con `Authorization: Bearer <token>` si hay token.
+    3. OpenSky responde `{ time, states: [[icao24, callsign, país, ..., lng, lat, ...], ...] }`; cada fila tiene 17 campos.
+11. **`toSnapshot`** valida esa forma con Zod y pasa cada fila por **`toAircraftState`**. Por ejemplo, `["a5f852", "RTY484  ", "United States", 1792201638, 1792201638, -104.4365, 40.6924, 2103.12, false, 67.42, 27.74, ...]` (primera fila del fixture) se convierte en `{ icao24: "a5f852", callsign: "RTY484", lat: 40.6924, lng: -104.4365, alt: 2103.12, onGround: false, spd: 67.42, hdg: 27.74, ts: 1792201638 }`. Las filas sin posición se descartan.
 12. **`TtlCache`** guarda el `AircraftSnapshot` durante `OPENSKY_CACHE_TTL_MS`.
 13. **`listAircraft`** responde `{ time, count, aircraft: [...] }` con estado 200.
 14. Al terminar de enviar, **`correlationId`** escribe `"request completed"` con el mismo id, el estado y los milisegundos.

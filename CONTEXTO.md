@@ -116,14 +116,12 @@ routes/          auth · flights · shipments · tracking · airports · users
 services/        lógica de negocio
 repositories/    acceso a datos (Prisma)
 validators/      esquemas Zod
-providers/       OpenSkyProvider (reemplaza a simulator/)
+providers/       OpenSkyProvider
 websocket/       servidor ws, canales por vuelo
 utils/
 migrations/      migraciones versionadas
 server.ts
 ```
-
-Nota: la carpeta `simulator/` actual se reemplaza por `providers/`.
 
 ### Frontend (`frontend/src/`)
 
@@ -181,8 +179,8 @@ main.ts · App.vue
 ## 13. Pendientes por cerrar
 
 - [ ] Nombre del proyecto.
-- [ ] Registrar cuenta en OpenSky (OAuth2) y comprobar créditos disponibles.
-- [ ] Prueba rápida: consultar un avión de EE. UU. por `icao24` y ver campos devueltos y frecuencia de actualización.
+- [x] Registrar cuenta en OpenSky (OAuth2) y comprobar créditos disponibles.
+- [x] Prueba rápida: consultar un avión de EE. UU. por `icao24` y ver campos devueltos y frecuencia de actualización.
 - [ ] División del trabajo (quién backend, quién frontend).
 - [ ] Contrato de la API.
 
