@@ -31,7 +31,7 @@ Guía para entender y explicar el código. El backend es un servidor Express con
 | `routes/health.routes.ts` | Route | Conecta `GET /health` con su controller. |
 | `routes/aircraft.routes.ts` | Route | Conecta `GET /api/aircraft` y `GET /api/aircraft/:icao24`. |
 | `validators/aircraft.validator.ts` | Validación | Esquema Zod: `icao24` debe tener 6 caracteres hexadecimales. |
-| `controllers/health.controller.ts` | Controller | Responde `{ status: "ok" }`. |
+| `controllers/health.controller.ts` | Controller | Responde `{ status: "ok", uptime, timestamp }`. |
 | `controllers/aircraft.controller.ts` | Controller | Recibe la petición, llama al service y responde JSON. |
 | `services/aircraft.service.ts` | Service | Lógica: define la caja de EE. UU., usa la caché y lanza 404 si no hay avión. |
 | `providers/openSky.provider.ts` | Provider | Único que habla con OpenSky: token OAuth2, consulta, conversión a `AircraftState` y errores. |
@@ -41,7 +41,7 @@ Guía para entender y explicar el código. El backend es un servidor Express con
 |---|---|
 | `utils/AppError.ts` | Error con código HTTP y código legible (`NOT_FOUND`, `OPENSKY_TIMEOUT`...). |
 | `utils/ttlCache.ts` | Caché en memoria con tiempo de vida; evita llamadas repetidas a OpenSky. |
-| `types/aircraft.ts` | Contrato `AircraftState`: la forma de un avión en la API. |
+| `types/aircraft.ts` | Contratos `AircraftState` (la forma de un avión en la API) y `AircraftSnapshot` (el lote con su `time`). |
 | `types/express.d.ts` | Le dice a TypeScript que `req` tiene `correlationId` y `log`. |
 | `scripts/saveFixture.ts` | Guarda una respuesta real de OpenSky en `fixtures/opensky-sample.json`. |
 | `fixtures/opensky-sample.json` | Respuesta real grabada; plan B de la demo con `USE_FIXTURE=true`. |
@@ -61,10 +61,10 @@ Guía para entender y explicar el código. El backend es un servidor Express con
    - Si hay dato fresco, el log dice **"cache hit"** y se devuelve sin llamar a OpenSky.
    - Si no, el log dice **"cache miss"** y se llama al provider.
 9. **`openSky.provider.ts`**:
-   1. Consigue un token OAuth2 (lo reutiliza hasta 60 s antes de que venza).
-   2. Llama a `https://opensky-network.org/api/states/all` con la caja de EE. UU.
+   1. Si `USE_FIXTURE=true`, lee `fixtures/opensky-sample.json` y salta al paso 3.
+   2. Si hay credenciales, consigue un token OAuth2 (lo reutiliza hasta 60 s antes de que venza); si no, consulta en modo anónimo. Llama a `https://opensky-network.org/api/states/all` con la caja de EE. UU.
    3. Valida la respuesta con Zod (`states` puede venir `null`).
-   4. Convierte cada fila (un arreglo de 18 campos) en un `AircraftState` y descarta los aviones sin latitud o longitud.
+   4. Convierte cada fila (un arreglo de 17 campos) en un `AircraftState` y descarta los aviones sin latitud o longitud.
 10. **Vuelta al service:** guarda el resultado en la caché por `OPENSKY_CACHE_TTL_MS` milisegundos.
 11. **Vuelta al controller:** responde `{ time, count, aircraft: [...] }`.
 12. **`correlationId`** escribe al final el log `"request completed"` con el estado y la duración.
@@ -107,4 +107,4 @@ El repository accede a nuestra base de datos (Prisma); el provider accede a una 
 
 ## 4. Dato importante sobre la cuota de OpenSky
 
-Una consulta de toda la caja de EE. UU. cuesta **4 créditos**. Una cuenta registrada tiene **4000 créditos al día**: unas 1000 consultas. Con TTL de 10 s y el mapa abierto, son hasta 360 consultas por hora (1440 créditos), así que la cuota alcanza para unas 2 o 3 horas de uso continuo. Para el desarrollo conviene subir `OPENSKY_CACHE_TTL_MS` (por ejemplo a `30000`) y apagar el servidor cuando no se use.
+Una consulta de toda la caja de EE. UU. cuesta **4 créditos**. Una cuenta registrada tiene **4000 créditos al día**: unas 1000 consultas. Con TTL de 10 s y el mapa abierto, son hasta 360 consultas por hora (1440 créditos), así que la cuota alcanza para unas 2 o 3 horas de uso continuo. Por eso `.env.example` trae `OPENSKY_CACHE_TTL_MS=30000` (el mínimo y valor por defecto es `10000`). Durante el desarrollo conviene dejarlo así y apagar el servidor cuando no se use.

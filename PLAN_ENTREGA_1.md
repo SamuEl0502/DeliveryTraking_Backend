@@ -11,8 +11,8 @@
 
 | Prioridad | Qué | Estado para mañana |
 |---|---|---|
-| **MUST** | Backend base (`/health`, correlation-id, errores, env con Zod) | Debe estar |
-| **MUST** | `OpenSkyProvider` + caché + endpoint de aviones | Debe estar |
+| **MUST** | Backend base (`/health`, correlation-id, errores, env con Zod) | Hecho |
+| **MUST** | `OpenSkyProvider` + caché + endpoint de aviones | Hecho |
 | **MUST** | Frontend: mapa con aviones reales y panel del avión seguido | Debe estar |
 | SHOULD | Suavizado de trayectoria (lerp + `requestAnimationFrame`) | Si hay tiempo |
 | SHOULD | Esquema Prisma + migración + seed de aeropuertos | Si hay tiempo |
@@ -25,10 +25,10 @@ Para mañana el frontend consulta por polling al backend (con caché). Se explic
 
 ## 1. Bloque 0: Preparación (30 min)
 
-- [ ] Registrar la cuenta en OpenSky **ahora** (si hay demora de activación, no te bloquea después). Guardar client id y secret en `.env`.
-- [ ] Pegar `CONTEXTO.md` en la raíz de ambos repos.
-- [ ] Renombrar `simulator/` a `providers/` en el backend. Crear `websocket/`, `utils/` y `migrations/` si faltan.
-- [ ] Confirmar que `.env` no se sube (`git status`).
+- [x] Registrar la cuenta en OpenSky **ahora** (si hay demora de activación, no te bloquea después). Guardar client id y secret en `.env`.
+- [x] Pegar `CONTEXTO.md` en la raíz de ambos repos.
+- [x] Renombrar `simulator/` a `providers/` en el backend. Crear `websocket/`, `utils/` y `migrations/` si faltan.
+- [x] Confirmar que `.env` no se sube (`git status`).
 - [ ] Verificar que Node (LTS) y PostgreSQL están instalados.
 
 *Tu amigo puede hacer el registro en OpenSky y la instalación de PostgreSQL por su lado.*
@@ -39,14 +39,14 @@ Para mañana el frontend consulta por polling al backend (con caché). Se explic
 
 **Instalar:** `express`, `zod`, `dotenv`, `helmet`, `cors`, `express-rate-limit`, `pino` (logs estructurados) y como dev `typescript`, `tsx`, `@types/express`, `@types/node`.
 
-- [ ] `tsconfig.json` con `strict: true`. Renombrar `server.js` a `server.ts`.
-- [ ] `config/env.ts`: lee `.env` y lo valida con Zod (falla al arrancar si falta algo).
-- [ ] `middlewares/correlationId.ts`: toma `x-correlation-id` del header o genera uno, lo devuelve en la respuesta y lo pone en los logs.
-- [ ] `middlewares/errorHandler.ts`: manejo global de errores con formato JSON único.
-- [ ] `middlewares/rateLimiter.ts`, `helmet` y `cors` en `app.ts`.
-- [ ] Separar `app.ts` (configura Express) de `server.ts` (levanta el servidor).
-- [ ] `GET /health`.
-- [ ] Script `npm run dev`.
+- [x] `tsconfig.json` con `strict: true`. Renombrar `server.js` a `server.ts`.
+- [x] `config/env.ts`: lee `.env` y lo valida con Zod (falla al arrancar si falta algo).
+- [x] `middlewares/correlationId.ts`: toma `x-correlation-id` del header o genera uno, lo devuelve en la respuesta y lo pone en los logs.
+- [x] `middlewares/errorHandler.ts`: manejo global de errores con formato JSON único.
+- [x] `middlewares/rateLimiter.ts`, `helmet` y `cors` en `app.ts`.
+- [x] Separar `app.ts` (configura Express) de `server.ts` (levanta el servidor).
+- [x] `GET /health`.
+- [x] Script `npm run dev`.
 
 **Listo cuando:** `curl -i localhost:PORT/health` responde JSON, trae el header `x-correlation-id` y el log muestra ese mismo id.
 
@@ -54,13 +54,13 @@ Para mañana el frontend consulta por polling al backend (con caché). Se explic
 
 ## 3. Bloque 2: OpenSky (60-90 min)
 
-- [ ] **Primero, a mano:** hacer una consulta de prueba (Postman o curl) con una caja geográfica de EE. UU. y mirar qué devuelve. Revisar en la documentación de OpenSky el orden de los campos de cada estado antes de mapearlos.
-- [ ] **Guardar una respuesta real en un JSON** (`fixtures/opensky-sample.json`). Es tu plan B para la demo si la API falla o se agota el cupo.
-- [ ] `types`: `AircraftState` (`icao24`, `callsign`, `lat`, `lng`, `hdg`, `spd`, `alt`, `onGround`, `ts`).
-- [ ] `providers/openSky.provider.ts`: Axios con OAuth2 (o anónimo si la cuenta aún no está activa), convierte la respuesta al tipo `AircraftState`, ignora aviones sin posición y maneja el caso de lista vacía o `null`.
-- [ ] Caché en memoria (TTL de 10 s o más, configurable en `.env`). La API de OpenSky **nunca** se llama desde el frontend.
-- [ ] Ruta, controller y service: `GET /api/aircraft` (aviones de la caja de EE. UU.) y `GET /api/aircraft/:icao24`.
-- [ ] Zod valida los parámetros de la ruta.
+- [x] **Primero, a mano:** hacer una consulta de prueba (Postman o curl) con una caja geográfica de EE. UU. y mirar qué devuelve. Revisar en la documentación de OpenSky el orden de los campos de cada estado antes de mapearlos.
+- [x] **Guardar una respuesta real en un JSON** (`fixtures/opensky-sample.json`). Es tu plan B para la demo si la API falla o se agota el cupo.
+- [x] `types`: `AircraftState` (`icao24`, `callsign`, `lat`, `lng`, `hdg`, `spd`, `alt`, `onGround`, `ts`).
+- [x] `providers/openSky.provider.ts`: Axios con OAuth2 (o anónimo si la cuenta aún no está activa), convierte la respuesta al tipo `AircraftState`, ignora aviones sin posición y maneja el caso de lista vacía o `null`.
+- [x] Caché en memoria (TTL de 10 s o más, configurable en `.env`). La API de OpenSky **nunca** se llama desde el frontend.
+- [x] Ruta, controller y service: `GET /api/aircraft` (aviones de la caja de EE. UU.) y `GET /api/aircraft/:icao24`.
+- [x] Zod valida los parámetros de la ruta.
 
 **Listo cuando:** `/api/aircraft` devuelve la lista tipada y una segunda llamada dentro del TTL muestra "cache hit" en el log.
 
