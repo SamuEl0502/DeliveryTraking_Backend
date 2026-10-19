@@ -64,4 +64,12 @@ assert.equal(flight?.arrival.scheduled, '2026-10-20T00:55:00.000Z');
 assert.equal(localToIso('2026-01-15T08:00:00+00:00', 'America/New_York'), '2026-01-15T13:00:00.000Z');
 assert.equal(toActiveFlight({ data: [] }, 'aae316', 'AAL3304'), null);
 
+// Respuesta real con SOLO códigos compartidos (EI7399, AY3673): debe salir el operador, American
+const codeshareOnly: unknown = JSON.parse(
+  readFileSync(new URL('../fixtures/aviationstack-codeshare-only.json', import.meta.url), 'utf8'),
+);
+const operated = toActiveFlight(codeshareOnly, 'aae316', 'AAL3304');
+assert.equal(operated?.flightNumber, 'AA3304');
+assert.equal(operated?.airline, 'American Airlines');
+
 console.log('check OK');

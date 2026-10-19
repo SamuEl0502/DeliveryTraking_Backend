@@ -32,7 +32,12 @@ const flightSchema = z.object({
   departure: movementSchema,
   arrival: movementSchema,
   airline: z.object({ name: str }).nullish(),
-  flight: z.object({ iata: str, icao: str, codeshared: z.unknown().nullish() }),
+  flight: z.object({
+    iata: str,
+    icao: str,
+    // En una fila de código compartido, quién opera el vuelo de verdad
+    codeshared: z.object({ airline_name: str, flight_iata: str, flight_icao: str }).nullish(),
+  }),
   aircraft: z.object({ icao24: str }).nullish(),
 });
 
@@ -96,6 +101,10 @@ function toTimes(m: z.infer<typeof movementSchema>): FlightTimes {
   };
 }
 
+// codeshared trae el nombre en minúsculas ("american airlines")
+const titleCase = (s: string | null | undefined) =>
+  s ? s.replace(/\b\w/g, (c) => c.toUpperCase()) : null;
+
 // La respuesta trae el vuelo del operador y sus códigos compartidos (Aer Lingus, Finnair...)
 // sobre el mismo avión: preferimos el del operador (codeshared null) y el mismo icao24
 export function pickFlight(flights: Flight[], icao24: string): Flight | undefined {
@@ -111,9 +120,12 @@ export function toActiveFlight(raw: unknown, icao24: string, callsign: string): 
   }
   const f = pickFlight(parsed.data.data, icao24);
   if (!f) return null;
+  // A veces solo llegan filas de código compartido (EI7399 de Aer Lingus sobre AA3304):
+  // el número y la aerolínea se toman del operador que indica codeshared
+  const operator = f.flight.codeshared;
   return {
-    flightNumber: f.flight.iata ?? f.flight.icao ?? callsign,
-    airline: f.airline?.name ?? null,
+    flightNumber: operator?.flight_iata?.toUpperCase() ?? f.flight.iata ?? f.flight.icao ?? callsign,
+    airline: operator ? titleCase(operator.airline_name) : (f.airline?.name ?? null),
     status: f.flight_status ?? 'unknown',
     departure: toTimes(f.departure),
     arrival: toTimes(f.arrival),
