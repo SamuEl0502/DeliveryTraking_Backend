@@ -310,7 +310,7 @@ Al cargar el archivo se escribe el log `"OpenSky provider mode"` con el modo: `f
 | `aircraftCache`, `routeCache` | — | `TtlCache` | Caché de 6 h del avión (por `icao24`) y de la ruta (por indicativo). | `getDetails` |
 | `scheduleCache` | — | `TtlCache` | Caché de 30 min de los horarios (por indicativo). | `getSchedule` |
 | `distanceKm(a, b)` | dos puntos `{ lat, lng }` | km | Distancia sobre la Tierra con la fórmula de haversine. | `computeProgress`, `checkProgress.ts` |
-| `computeProgress(state, route)` | avión y ruta | `{ progress, verified }` | Calcula km totales, recorridos y restantes, % y ETA (km restantes / velocidad). `verified` es `false` si el desvío pasa de 1,3. | `getDetails`, `checkProgress.ts` |
+| `computeProgress(state, route)` | avión y ruta | `{ progress, verified }` | Calcula km totales, recorridos y restantes, % y ETA (km restantes / velocidad). `totalKm` es recorrido + restante, para que el % cuadre. `verified` es `false` si el desvío pasa de 1,2 o si el rumbo se aleja más de 90° del destino (esto último no se exige a menos de 100 km del destino). | `getDetails`, `checkProgress.ts` |
 | `getDetails(icao24, log)` | código del avión y logger | `Promise<AircraftDetails>` | Toma el avión de OpenSky (de la caché), pide a adsbdb el avión y la ruta en paralelo, y calcula el progreso. Si adsbdb falla, devuelve `null` en esas partes sin cortar la respuesta. | `getAircraftDetails` |
 | `getSchedule(icao24, log)` | código del avión y logger | `Promise<FlightSchedule>` | Con el indicativo del avión pide los horarios a AeroDataBox. Sin indicativo o sin vuelo, lanza 404 `SCHEDULE_NOT_FOUND`. | `getAircraftSchedule` |
 
@@ -458,7 +458,7 @@ Seguimos un avión desde OpenSky hasta el JSON que recibe el cliente con `GET /a
 | Validar un parámetro nuevo de una ruta | Agregar el esquema en `validators/`, y en la route ponerlo con `validateParams(...)` antes del controller. |
 | Validar parámetros de consulta (`?x=...`) | Hoy no existe; habría que crear un middleware parecido a `validateParams` para `req.query`. |
 | Cambiar cuánto duran en caché la ruta o los horarios | `STATIC_TTL_MS` y `SCHEDULE_TTL_MS` en `services/flightDetails.service.ts`. |
-| Cambiar cuándo una ruta se considera no verificada | `MAX_DETOUR` en `services/flightDetails.service.ts`. |
+| Cambiar cuándo una ruta se considera no verificada | `MAX_DETOUR`, `MAX_HEADING_OFF_DEG` y `HEADING_CHECK_MIN_KM` en `services/flightDetails.service.ts`. |
 | Agregar un campo al avión (por ejemplo, velocidad vertical) | (1) Agregarlo en `types/aircraft.ts`. (2) Agregar su índice en `F` (el 11 es `vertical_rate` según la documentación de OpenSky). (3) Llenarlo en `toAircraftState`. (4) Actualizar el tipo en el frontend. |
 | Cambiar la zona geográfica consultada | `US_BOX` en `services/aircraft.service.ts` (ojo: cajas grandes gastan más créditos). |
 | Agregar un endpoint nuevo | route en `routes/` → controller en `controllers/` → función en el service → (si necesita datos externos) provider. Montar el router en `app.ts`. |

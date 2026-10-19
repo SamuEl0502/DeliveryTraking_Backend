@@ -101,7 +101,7 @@ Todas las respuestas son JSON y llevan el header `x-correlation-id`. Las rutas b
 
 Los tipos de `/details` y `/schedule` están en [`backend/types/flightDetails.ts`](backend/types/flightDetails.ts). Detalles importantes:
 - `aircraft` y `route` son `null` si adsbdb no los conoce (por ejemplo, aviones privados). Si adsbdb falla, también llegan `null` y el resto de la respuesta sigue igual.
-- `route.verified` es `false` si la posición del avión no encaja con la ruta (desvío mayor al 30 %). En ese caso `progress` es `null`.
+- `route.verified` es `false` si la posición del avión no encaja con la ruta (desvío mayor al 20 %, o rumbo a más de 90° del destino). En ese caso `progress` es `null`.
 - `progress.etaMinutes` es una estimación en línea recta a la velocidad actual; `null` en tierra o sin velocidad.
 - En `/schedule`, las horas van en ISO 8601 UTC, y `revised` puede ser una hora real o estimada.
 

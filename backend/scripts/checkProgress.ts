@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { computeProgress, distanceKm } from '../services/flightDetails.service.ts';
+import { bearingDeg, computeProgress, distanceKm } from '../services/flightDetails.service.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 
 // Prueba rápida de la geometría del panel: npm run check
@@ -25,8 +25,24 @@ assert.equal(mid.verified, true);
 assert.ok(mid.progress.percent > 40 && mid.progress.percent < 60);
 assert.ok(mid.progress.etaMinutes !== null && mid.progress.etaMinutes > 40 && mid.progress.etaMinutes < 60);
 
+// recorrido + restante = total
+assert.equal(mid.progress.flownKm + mid.progress.remainingKm - mid.progress.totalKm <= 1, true);
+
 // En Texas, lejos de la ruta: no verificada
 assert.equal(computeProgress(plane(32.8, -97.0), route).verified, false);
+
+// En la ruta pero volando al revés (rumbo oeste, destino al este): no verificada
+const backwards = { ...plane(42.2, -79.5), hdg: 270 };
+assert.equal(computeProgress(backwards, route).verified, false);
+
+// Caso real reportado: UAL19 "JFK→SFO" sobre el Atlántico con rumbo 55°: no verificada
+const jfk = { icao: 'KJFK', iata: 'JFK', name: 'JFK', city: 'New York', lat: 40.6398, lng: -73.7789 };
+const sfo = { icao: 'KSFO', iata: 'SFO', name: 'SFO', city: 'San Francisco', lat: 37.619, lng: -122.375 };
+const ual19 = { ...plane(43.8, -66.53), hdg: 55 };
+assert.equal(computeProgress(ual19, { ...route, origin: jfk, destination: sfo }).verified, false);
+
+// De ORD a BOS se vuela casi al este: rumbo inicial ~80°
+assert.ok(Math.abs(bearingDeg(ord, bos) - 80) < 10);
 
 // Sin velocidad no hay ETA
 assert.equal(computeProgress(plane(42.2, -79.5, null), route).progress.etaMinutes, null);

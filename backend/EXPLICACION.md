@@ -114,7 +114,7 @@ El repository accede a nuestra base de datos (Prisma); el provider accede a una 
 Cada una da algo que las otras no dan, y se usa la más barata para cada dato. OpenSky da la posición en vivo, pero no sabe el origen ni el destino. adsbdb da la ruta y el avión gratis. AeroDataBox da horarios y puertas, pero su plan gratis solo alcanza para unas 200 consultas al mes, por eso solo se llama cuando el usuario pulsa "Ver horarios".
 
 **10. ¿Cómo saben si la ruta es correcta?**
-adsbdb devuelve la ruta asignada al indicativo, que a veces está desactualizada. El service suma la distancia del origen al avión y del avión al destino; si es más de un 30 % mayor que la distancia directa, el avión no está en esa ruta y se marca `verified: false`.
+adsbdb devuelve la ruta asignada al indicativo, que a veces está desactualizada. El service suma la distancia del origen al avión y del avión al destino; si es más de un 20 % mayor que la distancia directa, o si el rumbo del avión se aleja más de 90° de la dirección al destino, el avión no está en esa ruta y se marca `verified: false`. Por ejemplo, UAL19 decía JFK→SFO pero volaba hacia el noreste sobre el Atlántico.
 
 ## 4. Dato importante sobre la cuota de OpenSky
 

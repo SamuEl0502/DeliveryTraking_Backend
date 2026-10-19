@@ -22,8 +22,11 @@ import { getAircraftByIcao24 } from './aircraft.service.ts';
 // Avión y ruta cambian poco: 6 h. Horarios cambian con retrasos: 30 min
 const STATIC_TTL_MS = 6 * 60 * 60 * 1000;
 const SCHEDULE_TTL_MS = 30 * 60 * 1000;
-// Si pasar por el avión alarga la ruta más de un 30 %, la ruta no encaja con la posición
-const MAX_DETOUR = 1.3;
+// La ruta encaja si pasar por el avión no la alarga más de un 20 %...
+const MAX_DETOUR = 1.2;
+// ...y el avión apunta hacia el destino (no se exige cerca de llegar: en la aproximación da vueltas)
+const MAX_HEADING_OFF_DEG = 90;
+const HEADING_CHECK_MIN_KM = 100;
 
 const aircraftCache = new TtlCache<AircraftInfo | null>(STATIC_TTL_MS);
 const routeCache = new TtlCache<Omit<FlightRoute, 'verified'> | null>(STATIC_TTL_MS);
@@ -40,16 +43,34 @@ export function distanceKm(a: { lat: number; lng: number }, b: { lat: number; ln
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
 }
 
+/** Rumbo inicial de a hacia b, en grados desde el norte (0 a 360) */
+export function bearingDeg(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const y = Math.sin(rad(b.lng - a.lng)) * Math.cos(rad(b.lat));
+  const x =
+    Math.cos(rad(a.lat)) * Math.sin(rad(b.lat)) -
+    Math.sin(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.cos(rad(b.lng - a.lng));
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+function headsToDestination(state: AircraftState, destination: { lat: number; lng: number }, remainingKm: number): boolean {
+  if (state.hdg === null || state.onGround || remainingKm < HEADING_CHECK_MIN_KM) return true;
+  const off = Math.abs(bearingDeg(state, destination) - state.hdg) % 360;
+  return Math.min(off, 360 - off) <= MAX_HEADING_OFF_DEG;
+}
+
 export function computeProgress(
   state: AircraftState,
   route: Omit<FlightRoute, 'verified'>,
 ): { progress: FlightProgress; verified: boolean } {
-  const totalKm = distanceKm(route.origin, route.destination);
+  const directKm = distanceKm(route.origin, route.destination);
   const flownKm = distanceKm(route.origin, state);
   const remainingKm = distanceKm(state, route.destination);
-  const verified = totalKm > 0 && (flownKm + remainingKm) / totalKm <= MAX_DETOUR;
+  // Trayecto pasando por el avión: así recorrido + restante = total y el % cuadra
+  const totalKm = flownKm + remainingKm;
+  const verified =
+    directKm > 0 && totalKm / directKm <= MAX_DETOUR && headsToDestination(state, route.destination, remainingKm);
   // ponytail: progreso y ETA en línea recta a velocidad actual; ignora vientos y aproximación
-  const percent = totalKm > 0 ? Math.min(100, Math.max(0, (flownKm / (flownKm + remainingKm)) * 100)) : 0;
+  const percent = totalKm > 0 ? (flownKm / totalKm) * 100 : 0;
   const moving = !state.onGround && state.spd !== null && state.spd > 0;
   return {
     verified,
