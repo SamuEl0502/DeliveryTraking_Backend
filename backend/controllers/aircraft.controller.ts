@@ -13,12 +13,12 @@ export async function getAircraft(req: Request<{ icao24: string }>, res: Respons
   res.json(aircraft);
 }
 
-// Panel del avión seleccionado: datos en vivo + avión + ruta + progreso (sin gastar AeroDataBox)
+// Panel del avión seleccionado: datos en vivo + avión + ruta + progreso (sin gastar Aviationstack)
 export async function getAircraftDetails(req: Request<{ icao24: string }>, res: Response): Promise<void> {
   res.json(await flightDetailsService.getDetails(req.params.icao24, req.log));
 }
 
-// Horarios bajo demanda: es la única ruta que consume unidades de AeroDataBox
+// Horarios bajo demanda: ruta real y horarios; es la única que gasta peticiones de Aviationstack
 export async function getAircraftSchedule(req: Request<{ icao24: string }>, res: Response): Promise<void> {
   res.json(await flightDetailsService.getSchedule(req.params.icao24, req.log));
 }
