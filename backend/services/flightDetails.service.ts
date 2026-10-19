@@ -1,10 +1,12 @@
 import type { Logger } from 'pino';
 import * as adsbdb from '../providers/adsbdb.provider.ts';
-import * as aeroDataBox from '../providers/aeroDataBox.provider.ts';
+import * as aviationStack from '../providers/aviationStack.provider.ts';
+import * as hexdb from '../providers/hexdb.provider.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 import type {
   AircraftDetails,
   AircraftInfo,
+  Airport,
   FlightProgress,
   FlightRoute,
   FlightSchedule,
@@ -17,11 +19,14 @@ import { getAircraftByIcao24 } from './aircraft.service.ts';
 //   OpenSky     -> posición, altitud, velocidad, rumbo (ya en caché por el mapa)
 //   adsbdb      -> modelo, matrícula, foto, aerolínea, origen y destino (gratis)
 //   este archivo -> progreso y ETA, calculados con las coordenadas (sin llamadas)
-//   AeroDataBox -> horarios, terminal, puerta y estado (2 unidades; solo si se piden)
+//   Aviationstack -> ruta real del tramo activo, horarios, terminal, puerta, retraso
+//                    (1 de 100 peticiones al mes; solo si se piden)
+//   hexdb       -> coordenadas de los aeropuertos de Aviationstack (gratis)
 
-// Avión y ruta cambian poco: 6 h. Horarios cambian con retrasos: 30 min
+// Avión y ruta cambian poco: 6 h. Horarios cambian con retrasos: 30 min. Aeropuertos no cambian: 30 días
 const STATIC_TTL_MS = 6 * 60 * 60 * 1000;
 const SCHEDULE_TTL_MS = 30 * 60 * 1000;
+const AIRPORT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 // La ruta encaja si pasar por el avión no la alarga más de un 20 %...
 const MAX_DETOUR = 1.2;
 // ...y el avión apunta hacia el destino (no se exige cerca de llegar: en la aproximación da vueltas)
@@ -30,7 +35,8 @@ const HEADING_CHECK_MIN_KM = 100;
 
 const aircraftCache = new TtlCache<AircraftInfo | null>(STATIC_TTL_MS);
 const routeCache = new TtlCache<Omit<FlightRoute, 'verified'> | null>(STATIC_TTL_MS);
-const scheduleCache = new TtlCache<FlightSchedule | null>(SCHEDULE_TTL_MS);
+const scheduleCache = new TtlCache<aviationStack.ActiveFlight | null>(SCHEDULE_TTL_MS);
+const airportCache = new TtlCache<Airport | null>(AIRPORT_TTL_MS);
 
 const EARTH_RADIUS_KM = 6371;
 const rad = (deg: number) => (deg * Math.PI) / 180;
@@ -108,18 +114,44 @@ export async function getDetails(icao24: string, log: Logger): Promise<AircraftD
   return { state, aircraft, route: { ...rawRoute, verified }, progress: verified ? progress : null };
 }
 
+async function getAirport(icao: string, log: Logger): Promise<Airport | null> {
+  return airportCache.getOrLoad(icao, () => hexdb.fetchAirport(icao), log).catch((err: unknown) => {
+    log.warn({ err }, 'airport coordinates unavailable');
+    return null;
+  });
+}
+
 export async function getSchedule(icao24: string, log: Logger): Promise<FlightSchedule> {
-  const { callsign } = await getAircraftByIcao24(icao24, log);
+  const state = await getAircraftByIcao24(icao24, log);
+  const callsign = state.callsign;
   if (!callsign) {
     throw new AppError(404, 'SCHEDULE_NOT_FOUND', `El avión ${icao24} no transmite indicativo`);
   }
-  const schedule = await scheduleCache.getOrLoad(
+  const flight = await scheduleCache.getOrLoad(
     callsign,
-    () => aeroDataBox.fetchScheduleByCallsign(callsign),
+    () => aviationStack.fetchActiveFlight(callsign, icao24),
     log,
   );
-  if (!schedule) {
-    throw new AppError(404, 'SCHEDULE_NOT_FOUND', `No hay horarios para el vuelo ${callsign}`);
+  if (!flight) {
+    throw new AppError(404, 'SCHEDULE_NOT_FOUND', `No hay un vuelo activo con el indicativo ${callsign}`);
   }
-  return schedule;
+
+  // Ruta real con coordenadas (hexdb); el progreso se recalcula con la posición de este momento
+  const [origin, destination] = await Promise.all([
+    flight.departure.airport ? getAirport(flight.departure.airport.icao, log) : null,
+    flight.arrival.airport ? getAirport(flight.arrival.airport.icao, log) : null,
+  ]);
+  let route: FlightRoute | null = null;
+  let progress: FlightProgress | null = null;
+  if (origin && destination) {
+    const raw = { callsign, flightNumber: flight.flightNumber, airline: null, origin, destination };
+    const computed = computeProgress(state, raw);
+    route = {
+      ...raw,
+      airline: flight.airline ? { name: flight.airline, icao: callsign.slice(0, 3), iata: null } : null,
+      verified: computed.verified,
+    };
+    progress = computed.verified ? computed.progress : null;
+  }
+  return { ...flight, route, progress, source: 'Aviationstack' };
 }

@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { localToIso, toActiveFlight } from '../providers/aviationStack.provider.ts';
 import { bearingDeg, computeProgress, distanceKm } from '../services/flightDetails.service.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 
-// Prueba rápida de la geometría del panel: npm run check
+// Prueba rápida del panel (geometría y elección del vuelo de Aviationstack): npm run check
 const ord = { lat: 41.9786, lng: -87.9048 };
 const bos = { lat: 42.3643, lng: -71.0052 };
 const route = {
@@ -47,4 +49,19 @@ assert.ok(Math.abs(bearingDeg(ord, bos) - 80) < 10);
 // Sin velocidad no hay ETA
 assert.equal(computeProgress(plane(42.2, -79.5, null), route).progress.etaMinutes, null);
 
-console.log('checkProgress OK');
+// Aviationstack: respuesta real de AAL3304 con 2 códigos compartidos (Aer Lingus, Finnair) sobre el mismo avión
+const sample: unknown = JSON.parse(readFileSync(new URL('../fixtures/aviationstack-sample.json', import.meta.url), 'utf8'));
+const flight = toActiveFlight(sample, 'aae316', 'AAL3304');
+assert.equal(flight?.flightNumber, 'AA3304');
+assert.equal(flight?.airline, 'American Airlines');
+assert.equal(flight?.departure.airport?.iata, 'MIA');
+assert.equal(flight?.arrival.airport?.iata, 'ORD');
+assert.equal(flight?.departure.delayMinutes, 30);
+// Horas locales -> UTC: MIA 17:40 (UTC-4) = 21:40Z; ORD 19:55 (UTC-5) = 00:55Z del día siguiente
+assert.equal(flight?.departure.actual, '2026-10-19T21:40:00.000Z');
+assert.equal(flight?.arrival.scheduled, '2026-10-20T00:55:00.000Z');
+// Cambio de horario: en enero Nueva York es UTC-5
+assert.equal(localToIso('2026-01-15T08:00:00+00:00', 'America/New_York'), '2026-01-15T13:00:00.000Z');
+assert.equal(toActiveFlight({ data: [] }, 'aae316', 'AAL3304'), null);
+
+console.log('check OK');

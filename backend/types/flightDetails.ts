@@ -54,22 +54,30 @@ export interface AircraftDetails {
   progress: FlightProgress | null;
 }
 
-/** Hora de un evento del vuelo; fechas en ISO 8601 UTC */
+/** Salida o llegada; fechas en ISO 8601 UTC */
 export interface FlightTimes {
-  airportIcao: string | null;
+  airport: { icao: string; iata: string | null; name: string } | null;
   scheduled: string | null;
-  /** Revisada: puede ser real o estimada */
-  revised: string | null;
+  estimated: string | null;
+  actual: string | null;
+  /** Retraso en minutos; null si no se sabe */
+  delayMinutes: number | null;
   terminal: string | null;
   gate: string | null;
 }
 
-/** Respuesta de GET /api/aircraft/:icao24/schedule (AeroDataBox) */
+/** Respuesta de GET /api/aircraft/:icao24/schedule (Aviationstack + hexdb) */
 export interface FlightSchedule {
+  /** Número comercial, por ejemplo "AA3304" */
   flightNumber: string;
-  /** Estado según AeroDataBox: Expected, EnRoute, Landed, Delayed, Canceled... */
+  airline: string | null;
+  /** scheduled, active, landed, cancelled, incident, diverted */
   status: string;
   departure: FlightTimes;
   arrival: FlightTimes;
-  source: 'AeroDataBox';
+  /** Ruta real del tramo que vuela ahora; reemplaza a la de /details (que puede estar equivocada) */
+  route: FlightRoute | null;
+  /** Progreso con la ruta real; null si la ruta no está verificada */
+  progress: FlightProgress | null;
+  source: 'Aviationstack';
 }
