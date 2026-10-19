@@ -301,6 +301,37 @@ Al cargar el archivo se escribe el log `"OpenSky provider mode"` con el modo: `f
 
 ---
 
+### `backend/services/flightDetails.service.ts`
+**Para qué existe:** arma el panel del avión seleccionado y decide qué API responde cada dato.
+**Dónde encaja:** capa service; lo llama `aircraft.controller.ts` y usa `aircraft.service.ts`, `adsbdb.provider.ts` y `aeroDataBox.provider.ts`.
+
+| Elemento | Recibe | Devuelve | Qué hace | Quién lo llama |
+|---|---|---|---|---|
+| `aircraftCache`, `routeCache` | — | `TtlCache` | Caché de 6 h del avión (por `icao24`) y de la ruta (por indicativo). | `getDetails` |
+| `scheduleCache` | — | `TtlCache` | Caché de 30 min de los horarios (por indicativo). | `getSchedule` |
+| `distanceKm(a, b)` | dos puntos `{ lat, lng }` | km | Distancia sobre la Tierra con la fórmula de haversine. | `computeProgress`, `checkProgress.ts` |
+| `computeProgress(state, route)` | avión y ruta | `{ progress, verified }` | Calcula km totales, recorridos y restantes, % y ETA (km restantes / velocidad). `verified` es `false` si el desvío pasa de 1,3. | `getDetails`, `checkProgress.ts` |
+| `getDetails(icao24, log)` | código del avión y logger | `Promise<AircraftDetails>` | Toma el avión de OpenSky (de la caché), pide a adsbdb el avión y la ruta en paralelo, y calcula el progreso. Si adsbdb falla, devuelve `null` en esas partes sin cortar la respuesta. | `getAircraftDetails` |
+| `getSchedule(icao24, log)` | código del avión y logger | `Promise<FlightSchedule>` | Con el indicativo del avión pide los horarios a AeroDataBox. Sin indicativo o sin vuelo, lanza 404 `SCHEDULE_NOT_FOUND`. | `getAircraftSchedule` |
+
+### `backend/providers/adsbdb.provider.ts`
+**Para qué existe:** habla con adsbdb (`api.adsbdb.com/v0`), gratis y sin llave. Timeout de 5 s.
+
+| Función | Devuelve | Qué hace |
+|---|---|---|
+| `fetchAircraftInfo(icao24)` | `AircraftInfo \| null` | `GET /aircraft/{icao24}`: modelo, matrícula, dueño y foto. 404 = `null`. |
+| `fetchRoute(callsign)` | ruta sin `verified`, o `null` | `GET /callsign/{callsign}`: aerolínea, número comercial, origen y destino. 404 = `null`. |
+
+Se usan dos llamadas y no la combinada (`/aircraft/{icao24}?callsign=`) porque la combinada responde 404 si falta cualquiera de los dos datos, y se perdería el otro.
+
+### `backend/providers/aeroDataBox.provider.ts`
+**Para qué existe:** habla con AeroDataBox. Según `AERODATABOX_MARKET` usa el acceso directo (`x-api-key`) o RapidAPI (`X-RapidAPI-Key`).
+
+| Elemento | Qué hace |
+|---|---|
+| `isEnabled` | `true` si hay `AERODATABOX_API_KEY`. |
+| `fetchScheduleByCallsign(callsign)` | `GET /flights/callsign/{callsign}` (2 unidades). Si hay varios tramos, elige el que está en el aire. Traduce errores: 402/429 → 503 `AERODATABOX_QUOTA_EXCEEDED`, 401/403 → 502 `AERODATABOX_AUTH_FAILED`, timeout → 504. |
+
 ## 10. Types
 
 ### `backend/types/aircraft.ts`
@@ -426,6 +457,8 @@ Seguimos un avión desde OpenSky hasta el JSON que recibe el cliente con `GET /a
 | Cambiar un color, el panel del avión o el mapa | En el repositorio del **frontend**, no en este. |
 | Validar un parámetro nuevo de una ruta | Agregar el esquema en `validators/`, y en la route ponerlo con `validateParams(...)` antes del controller. |
 | Validar parámetros de consulta (`?x=...`) | Hoy no existe; habría que crear un middleware parecido a `validateParams` para `req.query`. |
+| Cambiar cuánto duran en caché la ruta o los horarios | `STATIC_TTL_MS` y `SCHEDULE_TTL_MS` en `services/flightDetails.service.ts`. |
+| Cambiar cuándo una ruta se considera no verificada | `MAX_DETOUR` en `services/flightDetails.service.ts`. |
 | Agregar un campo al avión (por ejemplo, velocidad vertical) | (1) Agregarlo en `types/aircraft.ts`. (2) Agregar su índice en `F` (el 11 es `vertical_rate` según la documentación de OpenSky). (3) Llenarlo en `toAircraftState`. (4) Actualizar el tipo en el frontend. |
 | Cambiar la zona geográfica consultada | `US_BOX` en `services/aircraft.service.ts` (ojo: cajas grandes gastan más créditos). |
 | Agregar un endpoint nuevo | route en `routes/` → controller en `controllers/` → función en el service → (si necesita datos externos) provider. Montar el router en `app.ts`. |
