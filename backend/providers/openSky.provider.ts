@@ -11,6 +11,8 @@ const API_URL = 'https://opensky-network.org/api';
 const TOKEN_URL =
   'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token';
 const TIMEOUT_MS = 10_000;
+// Tope total de la descarga; el cliente no lo espera porque la caché sirve el dato viejo mientras tanto
+const STATES_DEADLINE_MS = 45_000;
 export const FIXTURE_URL = new URL('../fixtures/opensky-sample.json', import.meta.url);
 
 export interface BoundingBox {
@@ -82,7 +84,8 @@ async function getToken(forceRefresh = false): Promise<string | null> {
 async function requestStates(params: Record<string, string | number>): Promise<unknown> {
   const call = async (forceRefresh: boolean) => {
     const accessToken = await getToken(forceRefresh);
-    const config: AxiosRequestConfig = { params };
+    // timeout de Axios solo mide silencio: si OpenSky envía la respuesta a goteo, la señal corta el total
+    const config: AxiosRequestConfig = { params, signal: AbortSignal.timeout(STATES_DEADLINE_MS) };
     if (accessToken) config.headers = { Authorization: `Bearer ${accessToken}` };
     const res = await http.get('/states/all', config);
     const remaining = res.headers['x-rate-limit-remaining'];
@@ -118,7 +121,7 @@ function toAppError(err: unknown, step: 'token' | 'states'): AppError {
         `Se agotó la cuota diaria de OpenSky${retry ? `, reintenta en ${retry} s` : ''}`,
       );
     }
-    if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
+    if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT' || err.code === 'ERR_CANCELED') {
       return new AppError(504, 'OPENSKY_TIMEOUT', 'OpenSky no respondió a tiempo');
     }
     if (step === 'token' || status === 401 || status === 403) {

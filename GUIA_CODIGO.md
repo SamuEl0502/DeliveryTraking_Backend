@@ -375,7 +375,7 @@ Se usan dos llamadas y no la combinada (`/aircraft/{icao24}?callsign=`) porque l
 |---|---|---|---|---|
 | `class TtlCache<T>` | — | — | Guarda valores de tipo `T` por clave (`entries`) y las cargas en curso (`pending`). | El service crea dos: `boxCache` y `singleCache`. |
 | `constructor(ttlMs)` | milisegundos de vida | — | Guarda el TTL. | `aircraft.service.ts` |
-| `getOrLoad(key, loader, log)` | clave, función que trae el dato, logger | `Promise<T>` | (1) Si hay dato vigente, escribe `"cache hit"` y lo devuelve. (2) Si ya se está cargando esa clave, espera esa misma carga (`"cache wait"`). (3) Si no, escribe `"cache miss"`, llama a `loader()` y guarda el resultado con su vencimiento. Si `loader` falla pero había un dato vencido, devuelve ese dato viejo (`"serving stale cache"`) en vez del error. | `getUsAircraft`, `getAircraftByIcao24` |
+| `getOrLoad(key, loader, log)` | clave, función que trae el dato, logger | `Promise<T>` | (1) Si hay dato vigente, escribe `"cache hit"` y lo devuelve. (2) Si hay un dato vencido, lo devuelve al instante y lanza `loader()` en segundo plano para refrescarlo (`"cache stale"`); así el cliente no espera a una fuente lenta. Si ese refresco falla, el dato viejo se queda (`"serving stale cache"`). (3) Sin ningún dato, espera la carga en curso (`"cache wait"`) o la empieza (`"cache miss"`) y guarda el resultado con su vencimiento. | `getUsAircraft`, `getAircraftByIcao24` |
 
 Limitación conocida: las claves nunca se borran, así que la caché de aviones individuales crece con cada `icao24` distinto que se consulta. Para la escala de la demo no es un problema.
 

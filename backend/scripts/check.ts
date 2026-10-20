@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { localToIso, toActiveFlight } from '../providers/aviationStack.provider.ts';
+import { TtlCache } from '../utils/ttlCache.ts';
 import { bearingDeg, computeProgress, distanceKm } from '../services/flightDetails.service.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 
@@ -71,5 +72,17 @@ const codeshareOnly: unknown = JSON.parse(
 const operated = toActiveFlight(codeshareOnly, 'aae316', 'AAL3304');
 assert.equal(operated?.flightNumber, 'AA3304');
 assert.equal(operated?.airline, 'American Airlines');
+
+// Caché vencida: responde el dato viejo al instante, refresca en segundo plano y no se cuelga si la fuente falla
+const silent = { info() {}, warn() {} } as unknown as Parameters<TtlCache<number>['getOrLoad']>[2];
+const cache = new TtlCache<number>(0);
+assert.equal(await cache.getOrLoad('k', async () => 1, silent), 1);
+let release!: (v: number) => void;
+assert.equal(await cache.getOrLoad('k', () => new Promise<number>((r) => (release = r)), silent), 1);
+release(2);
+await new Promise((r) => setTimeout(r, 0));
+assert.equal(await cache.getOrLoad('k', () => Promise.reject(new Error('caída')), silent), 2);
+await new Promise((r) => setTimeout(r, 0));
+assert.equal(await cache.getOrLoad('k', async () => 3, silent), 2);
 
 console.log('check OK');

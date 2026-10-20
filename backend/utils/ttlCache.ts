@@ -21,11 +21,11 @@ export class TtlCache<T> {
 
     const inFlight = this.pending.get(key);
     if (inFlight) {
-      log.info({ key }, 'cache wait (load in progress)');
-      return inFlight;
+      log.info({ key }, entry ? 'cache stale (refresh in progress)' : 'cache wait (load in progress)');
+      return entry ? entry.value : inFlight;
     }
 
-    log.info({ key }, 'cache miss');
+    log.info({ key }, entry ? 'cache stale, refreshing' : 'cache miss');
     const promise = loader()
       .then((value) => {
         this.entries.set(key, { value, expiresAt: Date.now() + this.ttlMs });
@@ -42,6 +42,7 @@ export class TtlCache<T> {
       .finally(() => this.pending.delete(key));
 
     this.pending.set(key, promise);
-    return promise;
+    // Con un dato viejo se responde ya y se refresca en segundo plano: la fuente puede tardar más que el cliente
+    return entry ? entry.value : promise;
   }
 }
