@@ -13,8 +13,8 @@
 |---|---|---|
 | **MUST** | Backend base (`/health`, correlation-id, errores, env con Zod) | Hecho |
 | **MUST** | `OpenSkyProvider` + caché + endpoint de aviones | Hecho |
-| **MUST** | Frontend: mapa con aviones reales y panel del avión seguido | Debe estar |
-| SHOULD | Suavizado de trayectoria (lerp + `requestAnimationFrame`) | Si hay tiempo |
+| **MUST** | Frontend: mapa con aviones reales y panel del avión seguido | Hecho |
+| SHOULD | Suavizado de trayectoria (lerp + `requestAnimationFrame`) | Hecho |
 | SHOULD | Esquema Prisma + migración + seed de aeropuertos | Si hay tiempo |
 | COULD | WebSocket para el avión seguido | Solo si sobra |
 | **NO HOY** | Auth completa, RBAC, envíos, eventos, ETA, estados automáticos | Entregas 2 a 4 |
@@ -77,13 +77,13 @@ Para mañana el frontend consulta por polling al backend (con caché). Se explic
 
 **Instalar:** `vue-router`, `pinia`, `axios`, `leaflet`, `@types/leaflet`.
 
-- [ ] Pasar a TypeScript estricto: `vite.config.ts`, `tsconfig.json` con `strict`, `main.ts`, `App.vue` con `<script setup lang="ts">`.
-- [ ] `types/aircraft.ts`: mismo contrato que el backend.
-- [ ] `services/api.ts`: instancia de Axios con `baseURL` desde variable de entorno y un interceptor básico de errores.
-- [ ] `store/aircraft.ts` (Pinia): lista de aviones, `loading`, `error`, `lastUpdated`, y `selectedIcao24`.
-- [ ] `views/MapView.vue`: mapa Leaflet con tiles de OpenStreetMap, un marcador por avión rotado según su rumbo, polling cada 10 s.
-- [ ] Clic en un avión: se vuelve el "avión seguido" y se abre un panel lateral con callsign, velocidad, altitud, en tierra o en aire y hora de la última actualización.
-- [ ] Estados visibles: indicador de carga y banner de error si el backend no responde.
+- [x] Pasar a TypeScript estricto: `vite.config.ts`, `tsconfig.json` con `strict`, `main.ts`, `App.vue` con `<script setup lang="ts">`.
+- [x] `types/aircraft.ts`: mismo contrato que el backend.
+- [x] `services/api.ts`: instancia de Axios con `baseURL` desde variable de entorno y un interceptor básico de errores.
+- [x] `store/aircraft.ts` (Pinia): lista de aviones, `loading`, `error`, `lastUpdated`, y `selectedIcao24`.
+- [x] `views/MapView.vue`: mapa Leaflet con tiles de OpenStreetMap, un marcador por avión rotado según su rumbo, polling cada 10 s.
+- [x] Clic en un avión: se vuelve el "avión seguido" y se abre un panel lateral con callsign, velocidad, altitud, en tierra o en aire y hora de la última actualización.
+- [x] Estados visibles: indicador de carga y banner de error si el backend no responde.
 
 **Listo cuando:** abres el navegador, ves aviones reales sobre EE. UU., haces clic en uno y ves sus datos. Si apagas el backend, aparece el error y no se rompe la pantalla.
 
@@ -91,10 +91,18 @@ Para mañana el frontend consulta por polling al backend (con caché). Se explic
 
 ## 5. Bloque 4 (SHOULD): Suavizado (45-60 min)
 
-- [ ] `composables/useSmoothedPosition.ts`: guarda la posición anterior y la nueva, interpola linealmente (`lerp`) con `requestAnimationFrame` durante el intervalo entre actualizaciones.
-- [ ] Aplicarlo al avión seguido (y a todos si el rendimiento lo permite).
+- [x] `composables/useSmoothedPosition.ts`: guarda la posición anterior y la nueva, interpola linealmente (`lerp`) con `requestAnimationFrame` durante el intervalo entre actualizaciones.
+- [x] Aplicarlo al avión seguido (y a todos si el rendimiento lo permite).
 
 **Es lo más vistoso en la demo.** Si el tiempo aprieta, hazlo antes que Prisma.
+
+---
+
+## 5b. Extra (fuera del plan original): panel con ruta y horarios
+
+- [x] `GET /api/aircraft/:icao24/details`: avión y ruta (adsbdb), progreso y ETA calculados.
+- [x] `GET /api/aircraft/:icao24/schedule`: ruta real, horarios y puertas (Aviationstack + hexdb), solo con botón.
+- [x] Panel del frontend al estilo FlightRadar24, probado de punta a punta.
 
 ---
 
@@ -116,9 +124,9 @@ Solo si sobra tiempo real. `websocket/` con `ws`, un canal por avión seguido, q
 
 ## 8. Bloque final: Cierre (45 min, no lo saltes)
 
-- [ ] `README.md` de cada repo: qué es, cómo instalar, variables de `.env.example`, cómo correrlo.
-- [ ] `.env.example` actualizado (sin valores reales).
-- [ ] Commits ordenados, con ramas `feature/...` y PR a `main` si el tiempo lo permite.
+- [x] `README.md` de cada repo: qué es, cómo instalar, variables de `.env.example`, cómo correrlo.
+- [x] `.env.example` actualizado (sin valores reales).
+- [x] Commits ordenados, con ramas `feature/...` y PR a `main` si el tiempo lo permite.
 - [ ] Capturas de pantalla o un GIF corto del mapa.
 - [ ] Probar desde cero: ambos servidores arrancan con `npm run dev`.
 - [ ] Ensayar la demo una vez completa, cronometrada.

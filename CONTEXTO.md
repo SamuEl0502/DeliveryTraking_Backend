@@ -50,7 +50,19 @@ Campos clave a tener en cuenta:
 
 ---
 
-## 5. Fuente de datos: OpenSky Network (única fuente, sin simulador)
+## 5. Fuentes de datos (sin simulador)
+
+**Posición de los aviones: OpenSky Network** (única fuente de posiciones). Para el panel del avión seleccionado se suman fuentes externas, siempre desde el backend y bajo demanda:
+
+| Fuente | Para qué | Límite |
+|---|---|---|
+| adsbdb | Modelo, matrícula, foto y una ruta aproximada por indicativo | Gratis. Sus rutas no se pueden copiar a nuestra BD (solo caché en memoria) |
+| Aviationstack | Ruta real del tramo activo, horarios, retraso, terminal y puerta | 100 peticiones al mes; solo con el botón "Ver horarios" |
+| hexdb | Coordenadas de aeropuertos | Gratis |
+
+Consecuencia para el modelo de datos: el origen y destino de un `Flight` los define el Staff o el seed de aeropuertos (OurAirports), no adsbdb.
+
+Sobre OpenSky:
 
 - `OpenSkyProvider` hace polling cada 5-10 s **solo** de los `icao24` de aviones con envíos activos. Nunca se pide el mapa mundial.
 - **Aviones a consultar:** vuelos con envíos en `LOADED` (desde poco antes de la hora de salida) y en `IN_FLIGHT`. No basta con `IN_FLIGHT`, porque para detectar el despegue hay que consultar antes.

@@ -137,9 +137,51 @@ models/  repositories/  migrations/  websocket/   reservadas para próximas entr
 
 Más detalle: [`backend/EXPLICACION.md`](backend/EXPLICACION.md) (resumen y preguntas frecuentes) y [`GUIA_CODIGO.md`](GUIA_CODIGO.md) (archivo por archivo).
 
+## Qué muestra la página
+
+La página (repositorio del frontend, `http://localhost:5173`) es un mapa a pantalla completa con un panel lateral. Cada bloque sale de un endpoint de este backend:
+
+```
+┌──────────────────────────────┬────────────────────────────────┐
+│ Tarjeta "En el aire"         │ Panel del avión seleccionado   │
+│  aviones sobre EE. UU.       │                                │
+│  y hora de actualización     │  1. Cabecera                   │
+│                              │  2. Ruta y progreso            │
+│ Mapa (Leaflet + OSM)         │  3. Avión                      │
+│  un avión por marcador,      │  4. Horarios (con botón)       │
+│  rotado según su rumbo,      │  5. Datos en vivo              │
+│  con movimiento suave        │                                │
+└──────────────────────────────┴────────────────────────────────┘
+```
+
+| Zona | Qué muestra | Endpoint | Fuente |
+|---|---|---|---|
+| Tarjeta y mapa | Aviones sobre EE. UU. (polling cada 10 s, pausado si la pestaña está oculta), aviso de error si el backend no responde | `GET /api/aircraft` | OpenSky |
+| 1. Cabecera | Número de vuelo (UA251), aerolínea, "En el aire" / "En tierra" / "Señal perdida" | `/details` | adsbdb + OpenSky |
+| 2. Ruta y progreso | Origen → destino (IATA y ciudad), barra de progreso, km recorridos y restantes, "Llega en ~X h Y min". Si la ruta no encaja con la posición: "Ruta no verificada", sin barra. Si no hay ruta: "Ruta no disponible" | `/details` | adsbdb + cálculo propio |
+| 3. Avión | Foto, modelo y matrícula | `/details` | adsbdb |
+| 4. Horarios | Solo al pulsar "Ver horarios": ruta real del tramo activo (reemplaza a la del bloque 2), salida y llegada con hora real, estimada o programada, retraso, terminal y puerta. Muestra "Horarios: Aviationstack" | `/schedule` | Aviationstack + hexdb |
+| 5. Datos en vivo | Velocidad (km/h y kt), altitud (m y ft), rumbo, posición, hora de la última posición | `GET /api/aircraft` (store) | OpenSky |
+
+`/details` se pide una vez por selección; `/schedule`, solo con el botón. Si cualquiera falla, el panel sigue mostrando los datos en vivo.
+
 ## Estado actual
 
-**Funciona hoy (Entrega 1, Bloques 1 y 2)**
+Actualizado el 2026-10-19. Backend y frontend sincronizados en `main` (backend PR #2, frontend PR #1 y #2).
+
+| Bloque del plan | Estado |
+|---|---|
+| 0. Preparación | Hecho (falta confirmar PostgreSQL) |
+| 1. Esqueleto del backend | Hecho |
+| 2. OpenSky | Hecho |
+| 3. Frontend con mapa | Hecho (repositorio del frontend) |
+| 4. Movimiento suave | Hecho (repositorio del frontend) |
+| Extra: panel con ruta y horarios | Hecho (`/details`, `/schedule`) |
+| 5. Modelo de datos (Prisma + PostgreSQL) | **Siguiente** |
+| 6. WebSocket | Pendiente |
+| Cierre (capturas, prueba desde cero, ensayo) | Pendiente |
+
+**Funciona hoy**
 - `GET /health`, con el header `x-correlation-id` y logs estructurados.
 - `GET /api/aircraft`: aviones reales sobre EE. UU. desde OpenSky (OAuth2 o anónimo, según el `.env`), con caché en memoria.
 - `GET /api/aircraft/:icao24`: un avión concreto, con validación Zod. Se busca primero en la lista ya en caché, así que no gasta créditos de OpenSky.
@@ -147,6 +189,7 @@ Más detalle: [`backend/EXPLICACION.md`](backend/EXPLICACION.md) (resumen y preg
 - `GET /api/aircraft/:icao24/schedule`: ruta real, horarios, retraso, terminal y puerta bajo demanda (Aviationstack + hexdb).
 - Manejo global de errores con formato JSON único, `helmet`, CORS y rate limiting.
 - Plan B de demo con datos grabados (`USE_FIXTURE=true`).
+- `npm run check`: prueba la geometría del panel y la lectura de Aviationstack con respuestas reales.
 
 **Viene después**
 - Modelo de datos con Prisma y PostgreSQL (migraciones y seed de aeropuertos).
@@ -154,3 +197,20 @@ Más detalle: [`backend/EXPLICACION.md`](backend/EXPLICACION.md) (resumen y preg
 - Envíos y eventos de rastreo, con estados automáticos de despegue y aterrizaje.
 - WebSocket con un canal por vuelo.
 - ETA con retrasos acumulados y por WebSocket.
+
+## Cambios importantes en la API
+
+Lo que cambió respecto al contrato inicial y por qué. Si el frontend usa algo de esta lista, debe estar al día.
+
+| Fecha | PR | Cambio | Motivo |
+|---|---|---|---|
+| 2026-10-19 | #1 | Contrato de la API documentado en este README (endpoints, `AircraftState`, errores) | Trabajar backend y frontend en paralelo |
+| 2026-10-19 | #2 | Nuevo `GET /api/aircraft/:icao24/details` | Panel estilo FlightRadar24: avión, ruta, progreso y ETA |
+| 2026-10-19 | #2 | Nuevo `GET /api/aircraft/:icao24/schedule` | Horarios, puertas y ruta real solo bajo demanda, para cuidar el cupo |
+| 2026-10-19 | #2 | `GET /api/aircraft/:icao24` busca primero en la lista ya en caché | Seleccionar un avión ya no gasta créditos de OpenSky |
+| 2026-10-19 | #2 | La ruta de adsbdb se verifica por desvío (≤ 20 %) y por rumbo (≤ 90° del destino); si no encaja, `verified: false` y sin progreso | adsbdb acierta ~30 % en vivo; UAL19 salía como JFK→SFO sobre el Atlántico |
+| 2026-10-19 | #2 | AeroDataBox descartado; se usa Aviationstack (`AVIATIONSTACK_API_KEY`) | La llave de AeroDataBox era del acceso directo, que no tiene plan gratis |
+| 2026-10-19 | #2 | `/schedule` devuelve `route` y `progress` con la ruta real del tramo activo | Corrige la ruta de adsbdb (AAL3304: BOS→PHL era falso; el real es MIA→ORD) |
+| 2026-10-19 | #2 | Horas de Aviationstack convertidas de hora local a UTC | Aviationstack marca como `+00:00` la hora local del aeropuerto |
+| 2026-10-19 | #2 | En códigos compartidos se usan el número y la aerolínea del operador | Se mostraba "EI7399 · Aer Lingus" en un vuelo de American |
+| 2026-10-19 | #2 | Nuevos errores `AVIATIONSTACK_*` y `SCHEDULE_NOT_FOUND` | Errores de la nueva fuente con el formato único |
