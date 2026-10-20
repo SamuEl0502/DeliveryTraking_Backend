@@ -313,7 +313,7 @@ Al cargar el archivo se escribe el log `"OpenSky provider mode"` con el modo: `f
 | `distanceKm(a, b)` | dos puntos `{ lat, lng }` | km | Distancia sobre la Tierra con la fórmula de haversine. | `computeProgress`, `check.ts` |
 | `bearingDeg(a, b)` | dos puntos | grados | Rumbo inicial de `a` hacia `b`. | `computeProgress`, `check.ts` |
 | `computeProgress(state, route)` | avión y ruta | `{ progress, verified }` | Calcula km totales, recorridos y restantes, % y ETA (km restantes / velocidad). `totalKm` es recorrido + restante, para que el % cuadre. `verified` es `false` si el desvío pasa de 1,2 o si el rumbo se aleja más de 90° del destino (esto último no se exige a menos de 100 km del destino). | `getDetails`, `getSchedule`, `check.ts` |
-| `getDetails(icao24, log)` | código del avión y logger | `Promise<AircraftDetails>` | Toma el avión de OpenSky (de la caché), pide a adsbdb el avión y la ruta en paralelo, y calcula el progreso. Si adsbdb falla, devuelve `null` en esas partes sin cortar la respuesta. | `getAircraftDetails` |
+| `getDetails(icao24, log)` | código del avión y logger | `Promise<AircraftDetails>` | Toma el avión de OpenSky (de la caché), pide a adsbdb el avión (con la foto de Planespotters encima, si hay) y la ruta en paralelo, y calcula el progreso. Si adsbdb falla, devuelve `null` en esas partes sin cortar la respuesta. | `getAircraftDetails` |
 | `getSchedule(icao24, log)` | código del avión y logger | `Promise<FlightSchedule>` | Con el indicativo pide a Aviationstack el tramo activo, completa las coordenadas de los aeropuertos con hexdb y calcula la ruta real y el progreso con la posición actual. Sin indicativo o sin vuelo activo, lanza 404 `SCHEDULE_NOT_FOUND`. | `getAircraftSchedule` |
 
 ### `backend/providers/adsbdb.provider.ts`
@@ -325,6 +325,15 @@ Al cargar el archivo se escribe el log `"OpenSky provider mode"` con el modo: `f
 | `fetchRoute(callsign)` | ruta sin `verified`, o `null` | `GET /callsign/{callsign}`: aerolínea, número comercial, origen y destino. 404 = `null`. |
 
 Se usan dos llamadas y no la combinada (`/aircraft/{icao24}?callsign=`) porque la combinada responde 404 si falta cualquiera de los dos datos, y se perdería el otro.
+
+### `backend/providers/planespotters.provider.ts`
+**Para qué existe:** trae la foto del avión desde Planespotters (`api.planespotters.net/pub/photos`), gratis y sin llave. Sus fotos pasan revisión de moderadores; las de adsbdb (airport-data.com) a veces muestran la cabina u otro avión. Timeout de 5 s.
+
+| Función | Devuelve | Qué hace |
+|---|---|---|
+| `fetchPhoto(icao24)` | `AircraftPhoto \| null` | `GET /hex/{icao24}`: foto de 420×280, miniatura, enlace y fotógrafo. Si no hay foto o falla, `null`, y el panel usa la de adsbdb. |
+
+Condiciones de Planespotters: el User-Agent lleva la URL del repositorio como contacto, el frontend muestra el fotógrafo con un enlace a la foto, y la imagen no se descarga ni se guarda.
 
 ### `backend/providers/aviationStack.provider.ts`
 **Para qué existe:** habla con Aviationstack (`api.aviationstack.com/v1`). La llave va en la URL (`access_key`), por eso nunca se loguea la URL ni el error de Axios.

@@ -144,7 +144,7 @@ Más detalle: [`backend/EXPLICACION.md`](backend/EXPLICACION.md) (resumen y preg
 - `GET /health`, con el header `x-correlation-id` y logs estructurados.
 - `GET /api/aircraft`: aviones reales sobre EE. UU. desde OpenSky (OAuth2 o anónimo, según el `.env`), con caché en memoria.
 - `GET /api/aircraft/:icao24`: un avión concreto, con validación Zod. Se busca primero en la lista ya en caché, así que no gasta créditos de OpenSky.
-- `GET /api/aircraft/:icao24/details`: avión, ruta, progreso y ETA para el panel (adsbdb + cálculo propio).
+- `GET /api/aircraft/:icao24/details`: avión, ruta, progreso y ETA para el panel (adsbdb + cálculo propio). La foto viene de Planespotters, con el fotógrafo y el enlace para los créditos.
 - `GET /api/aircraft/:icao24/schedule`: ruta real, horarios, retraso, terminal y puerta bajo demanda (Aviationstack + hexdb).
 - Manejo global de errores con formato JSON único, `helmet`, CORS y rate limiting.
 - Plan B de demo con datos grabados (`USE_FIXTURE=true`).
