@@ -65,12 +65,13 @@ Cada dato sale de la fuente más barata. Las APIs externas solo se llaman desde 
 | Fuente | Qué da | Cuándo se llama | Costo |
 |---|---|---|---|
 | [OpenSky](https://openskynetwork.github.io/opensky-api/rest.html) | Posición, altitud, velocidad, rumbo, en tierra | Lista de EE. UU. con caché de `OPENSKY_CACHE_TTL_MS` | 4 créditos por consulta |
-| [adsbdb](https://github.com/mrjackwills/adsbdb) | Modelo, matrícula, foto, aerolínea, origen y destino | Al seleccionar un avión (caché de 6 h) | Gratis, sin llave |
+| [adsbdb](https://github.com/mrjackwills/adsbdb) | Modelo, matrícula, foto de respaldo, aerolínea, origen y destino | Al seleccionar un avión (caché de 6 h) | Gratis, sin llave |
+| [Planespotters](https://www.planespotters.net/photo/api) | Foto del avión revisada por moderadores, fotógrafo y enlace | Al seleccionar un avión (misma caché de 6 h) | Gratis, sin llave |
 | Cálculo propio | Progreso, km recorridos y restantes, ETA | Al seleccionar un avión | 0 |
 | [Aviationstack](https://aviationstack.com/pricing) | Ruta real del tramo activo, horarios programados/estimados/reales, retraso, terminal, puerta, estado | Solo con `/schedule` (caché de 30 min) | 1 petición (plan gratis: 100 al mes) |
 | [hexdb](https://hexdb.io) | Coordenadas de los aeropuertos de Aviationstack | Con `/schedule` (caché de 30 días) | Gratis, sin llave |
 
-Restricciones: los datos de rutas de adsbdb no se pueden copiar a otra base de datos (solo caché en memoria). El plan gratis de Aviationstack no permite uso comercial.
+Restricciones: los datos de rutas de adsbdb no se pueden copiar a otra base de datos (solo caché en memoria). El plan gratis de Aviationstack no permite uso comercial. Planespotters exige mostrar el fotógrafo con un enlace a la foto (`photographer`, `photoLink`) y no permite guardar la imagen.
 
 La ruta de adsbdb es la asignada al indicativo y en vivo acierta poco (7 de 25 vuelos en una prueba), porque las aerolíneas reutilizan números de vuelo. La de Aviationstack es la del tramo que el avión vuela ahora, así que `/schedule` la devuelve para reemplazar a la de `/details`.
 

@@ -86,6 +86,8 @@ export async function fetchAircraftInfo(icao24: string): Promise<AircraftInfo | 
     owner: a.registered_owner ?? null,
     photoUrl: a.url_photo ?? null,
     photoThumbnailUrl: a.url_photo_thumbnail ?? null,
+    photoLink: null,
+    photographer: null,
   };
 }
 

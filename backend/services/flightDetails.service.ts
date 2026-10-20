@@ -2,6 +2,7 @@ import type { Logger } from 'pino';
 import * as adsbdb from '../providers/adsbdb.provider.ts';
 import * as aviationStack from '../providers/aviationStack.provider.ts';
 import * as hexdb from '../providers/hexdb.provider.ts';
+import * as planespotters from '../providers/planespotters.provider.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 import type {
   AircraftDetails,
@@ -90,13 +91,21 @@ export function computeProgress(
   };
 }
 
+// Foto de Planespotters sobre la de adsbdb (airport-data.com sin moderar trae cabinas u otros aviones)
+async function loadAircraft(icao24: string): Promise<AircraftInfo | null> {
+  const [info, photo] = await Promise.all([adsbdb.fetchAircraftInfo(icao24), planespotters.fetchPhoto(icao24)]);
+  if (!photo) return info;
+  const base = info ?? { registration: null, model: null, icaoType: null, owner: null };
+  return { ...base, ...photo };
+}
+
 export async function getDetails(icao24: string, log: Logger): Promise<AircraftDetails> {
   const state = await getAircraftByIcao24(icao24, log);
   const callsign = state.callsign;
 
   // En paralelo; si adsbdb falla, el panel igual muestra los datos en vivo
   const [aircraft, rawRoute] = await Promise.all([
-    aircraftCache.getOrLoad(icao24, () => adsbdb.fetchAircraftInfo(icao24), log).catch((err: unknown) => {
+    aircraftCache.getOrLoad(icao24, () => loadAircraft(icao24), log).catch((err: unknown) => {
       log.warn({ err }, 'aircraft info unavailable');
       return null;
     }),
