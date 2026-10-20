@@ -35,12 +35,19 @@ Guía para entender y explicar el código. El backend es un servidor Express con
 | `controllers/aircraft.controller.ts` | Controller | Recibe la petición, llama al service y responde JSON. |
 | `services/aircraft.service.ts` | Service | Lógica: define la caja de EE. UU., usa la caché y lanza 404 si no hay avión. |
 | `providers/openSky.provider.ts` | Provider | Único que habla con OpenSky: token OAuth2, consulta, conversión a `AircraftState` y errores. |
+| `services/flightDetails.service.ts` | Service | Panel del avión seleccionado: decide qué API responde cada dato, calcula progreso y ETA y verifica la ruta. |
+| `providers/adsbdb.provider.ts` | Provider | Habla con adsbdb (gratis): modelo, matrícula y foto por `icao24`, y ruta por indicativo. |
+| `providers/aviationStack.provider.ts` | Provider | Habla con Aviationstack: tramo activo del vuelo (ruta real, horarios, retraso, terminal, puerta). Cada llamada gasta 1 de 100 peticiones al mes. |
+| `providers/hexdb.provider.ts` | Provider | Habla con hexdb (gratis): coordenadas de los aeropuertos que da Aviationstack. |
 
 ### Utilidades, tipos y datos
 | Archivo | Qué hace |
 |---|---|
 | `utils/AppError.ts` | Error con código HTTP y código legible (`NOT_FOUND`, `OPENSKY_TIMEOUT`...). |
 | `utils/ttlCache.ts` | Caché en memoria con tiempo de vida; evita llamadas repetidas a OpenSky. |
+| `types/flightDetails.ts` | Contratos del panel: `AircraftDetails`, `FlightRoute`, `FlightProgress`, `FlightSchedule`... |
+| `scripts/check.ts` | Prueba rápida (`npm run check`): distancias, progreso, ETA, elección del vuelo de Aviationstack y conversión de horas. |
+| `fixtures/aviationstack-sample.json` | Respuesta real de Aviationstack (AAL3304) que usa `check.ts`. |
 | `types/aircraft.ts` | Contratos `AircraftState` (la forma de un avión en la API) y `AircraftSnapshot` (el lote con su `time`). |
 | `types/express.d.ts` | Le dice a TypeScript que `req` tiene `correlationId` y `log`. |
 | `scripts/saveFixture.ts` | Guarda una respuesta real de OpenSky en `fixtures/opensky-sample.json`. |
@@ -104,6 +111,15 @@ El provider convierte el error en un `AppError`: 503 `OPENSKY_QUOTA_EXCEEDED` o 
 El repository accede a nuestra base de datos (Prisma); el provider accede a una API externa. Cumplen el mismo papel (aislar la fuente de datos), pero separarlos deja claro de dónde viene cada dato.
 
 ---
+
+**9. ¿Por qué varias APIs y no una?**
+Cada una da algo que las otras no dan, y se usa la más barata para cada dato. OpenSky da la posición en vivo, pero no sabe el origen ni el destino. adsbdb da el avión y una ruta aproximada gratis. Aviationstack da la ruta real, horarios y puertas, pero su plan gratis solo alcanza para 100 consultas al mes, por eso solo se llama cuando el usuario pulsa "Ver horarios". hexdb completa las coordenadas de los aeropuertos.
+
+**9b. ¿Por qué las horas de Aviationstack se convierten?**
+Aviationstack manda la hora local del aeropuerto, pero marcada como UTC (`+00:00`). Con AAL3304 se notó: la salida "17:40 UTC" implicaba 5 h de vuelo en un trayecto de 3 h. El provider toma la hora de reloj y la convierte con la zona horaria del aeropuerto (`America/New_York`), que viene en la misma respuesta.
+
+**10. ¿Cómo saben si la ruta es correcta?**
+adsbdb devuelve la ruta asignada al indicativo, que a veces está desactualizada. El service suma la distancia del origen al avión y del avión al destino; si es más de un 20 % mayor que la distancia directa, o si el rumbo del avión se aleja más de 90° de la dirección al destino, el avión no está en esa ruta y se marca `verified: false`. Por ejemplo, UAL19 decía JFK→SFO pero volaba hacia el noreste sobre el Atlántico.
 
 ## 4. Dato importante sobre la cuota de OpenSky
 

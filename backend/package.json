@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch server.ts",
     "typecheck": "tsc --noEmit",
-    "fixture:save": "tsx scripts/saveFixture.ts"
+    "fixture:save": "tsx scripts/saveFixture.ts",
+    "check": "tsx scripts/check.ts"
   },
   "dependencies": {
     "axios": "^1.20.0",

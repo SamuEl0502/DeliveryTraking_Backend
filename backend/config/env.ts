@@ -15,6 +15,8 @@ const envSchema = z.object({
   OPENSKY_CLIENT_SECRET: z.string().optional(),
   OPENSKY_CACHE_TTL_MS: z.coerce.number().int().min(10_000).default(10_000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+  // Opcional: sin llave, GET /api/aircraft/:icao24/schedule responde 503
+  AVIATIONSTACK_API_KEY: z.string().optional(),
   // Plan B de demo: servir fixtures/opensky-sample.json en vez de llamar a OpenSky
   USE_FIXTURE: z
     .enum(['true', 'false'])

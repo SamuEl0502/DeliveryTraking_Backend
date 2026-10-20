@@ -301,6 +301,44 @@ Al cargar el archivo se escribe el log `"OpenSky provider mode"` con el modo: `f
 
 ---
 
+### `backend/services/flightDetails.service.ts`
+**Para qué existe:** arma el panel del avión seleccionado y decide qué API responde cada dato.
+**Dónde encaja:** capa service; lo llama `aircraft.controller.ts` y usa `aircraft.service.ts`, `adsbdb.provider.ts`, `aviationStack.provider.ts` y `hexdb.provider.ts`.
+
+| Elemento | Recibe | Devuelve | Qué hace | Quién lo llama |
+|---|---|---|---|---|
+| `aircraftCache`, `routeCache` | — | `TtlCache` | Caché de 6 h del avión (por `icao24`) y de la ruta (por indicativo). | `getDetails` |
+| `scheduleCache` | — | `TtlCache` | Caché de 30 min del tramo activo de Aviationstack (por indicativo). | `getSchedule` |
+| `airportCache` | — | `TtlCache` | Caché de 30 días de las coordenadas de los aeropuertos (hexdb). | `getAirport` |
+| `distanceKm(a, b)` | dos puntos `{ lat, lng }` | km | Distancia sobre la Tierra con la fórmula de haversine. | `computeProgress`, `check.ts` |
+| `bearingDeg(a, b)` | dos puntos | grados | Rumbo inicial de `a` hacia `b`. | `computeProgress`, `check.ts` |
+| `computeProgress(state, route)` | avión y ruta | `{ progress, verified }` | Calcula km totales, recorridos y restantes, % y ETA (km restantes / velocidad). `totalKm` es recorrido + restante, para que el % cuadre. `verified` es `false` si el desvío pasa de 1,2 o si el rumbo se aleja más de 90° del destino (esto último no se exige a menos de 100 km del destino). | `getDetails`, `getSchedule`, `check.ts` |
+| `getDetails(icao24, log)` | código del avión y logger | `Promise<AircraftDetails>` | Toma el avión de OpenSky (de la caché), pide a adsbdb el avión y la ruta en paralelo, y calcula el progreso. Si adsbdb falla, devuelve `null` en esas partes sin cortar la respuesta. | `getAircraftDetails` |
+| `getSchedule(icao24, log)` | código del avión y logger | `Promise<FlightSchedule>` | Con el indicativo pide a Aviationstack el tramo activo, completa las coordenadas de los aeropuertos con hexdb y calcula la ruta real y el progreso con la posición actual. Sin indicativo o sin vuelo activo, lanza 404 `SCHEDULE_NOT_FOUND`. | `getAircraftSchedule` |
+
+### `backend/providers/adsbdb.provider.ts`
+**Para qué existe:** habla con adsbdb (`api.adsbdb.com/v0`), gratis y sin llave. Timeout de 5 s.
+
+| Función | Devuelve | Qué hace |
+|---|---|---|
+| `fetchAircraftInfo(icao24)` | `AircraftInfo \| null` | `GET /aircraft/{icao24}`: modelo, matrícula, dueño y foto. 404 = `null`. |
+| `fetchRoute(callsign)` | ruta sin `verified`, o `null` | `GET /callsign/{callsign}`: aerolínea, número comercial, origen y destino. 404 = `null`. |
+
+Se usan dos llamadas y no la combinada (`/aircraft/{icao24}?callsign=`) porque la combinada responde 404 si falta cualquiera de los dos datos, y se perdería el otro.
+
+### `backend/providers/aviationStack.provider.ts`
+**Para qué existe:** habla con Aviationstack (`api.aviationstack.com/v1`). La llave va en la URL (`access_key`), por eso nunca se loguea la URL ni el error de Axios.
+
+| Elemento | Qué hace |
+|---|---|
+| `isEnabled` | `true` si hay `AVIATIONSTACK_API_KEY`. |
+| `fetchActiveFlight(callsign, icao24)` | `GET /flights?flight_icao={callsign}&flight_status=active` (1 petición). Traduce errores: `usage_limit_reached` → 503 `AVIATIONSTACK_QUOTA_EXCEEDED`, llave inválida → 502 `AVIATIONSTACK_AUTH_FAILED`, timeout → 504. |
+| `pickFlight(flights, icao24)` | La respuesta trae el vuelo del operador y sus códigos compartidos sobre el mismo avión; elige el del operador (`codeshared` vacío) con el mismo `icao24`. |
+| `localToIso(t, tz)` | Aviationstack manda la hora local del aeropuerto marcada como `+00:00`; la convierte a UTC con la zona horaria (`Intl.DateTimeFormat`), en dos pasadas para acertar en los cambios de horario. |
+
+### `backend/providers/hexdb.provider.ts`
+**Para qué existe:** coordenadas de un aeropuerto por código ICAO (`hexdb.io/api/v1/airport/icao/{icao}`), gratis. 404 = `null`; otros fallos lanzan error para que el `null` no se guarde en caché.
+
 ## 10. Types
 
 ### `backend/types/aircraft.ts`
@@ -426,6 +464,8 @@ Seguimos un avión desde OpenSky hasta el JSON que recibe el cliente con `GET /a
 | Cambiar un color, el panel del avión o el mapa | En el repositorio del **frontend**, no en este. |
 | Validar un parámetro nuevo de una ruta | Agregar el esquema en `validators/`, y en la route ponerlo con `validateParams(...)` antes del controller. |
 | Validar parámetros de consulta (`?x=...`) | Hoy no existe; habría que crear un middleware parecido a `validateParams` para `req.query`. |
+| Cambiar cuánto duran en caché la ruta o los horarios | `STATIC_TTL_MS` y `SCHEDULE_TTL_MS` en `services/flightDetails.service.ts`. |
+| Cambiar cuándo una ruta se considera no verificada | `MAX_DETOUR`, `MAX_HEADING_OFF_DEG` y `HEADING_CHECK_MIN_KM` en `services/flightDetails.service.ts`. |
 | Agregar un campo al avión (por ejemplo, velocidad vertical) | (1) Agregarlo en `types/aircraft.ts`. (2) Agregar su índice en `F` (el 11 es `vertical_rate` según la documentación de OpenSky). (3) Llenarlo en `toAircraftState`. (4) Actualizar el tipo en el frontend. |
 | Cambiar la zona geográfica consultada | `US_BOX` en `services/aircraft.service.ts` (ojo: cajas grandes gastan más créditos). |
 | Agregar un endpoint nuevo | route en `routes/` → controller en `controllers/` → función en el service → (si necesita datos externos) provider. Montar el router en `app.ts`. |
