@@ -141,7 +141,7 @@ Más detalle: [`backend/EXPLICACION.md`](backend/EXPLICACION.md) (resumen y preg
 
 **Funciona hoy (Entrega 1, Bloques 1 y 2)**
 - `GET /health`, con el header `x-correlation-id` y logs estructurados.
-- `GET /api/aircraft`: aviones reales sobre EE. UU. desde OpenSky (OAuth2 o anónimo, según el `.env`), con caché en memoria.
+- `GET /api/aircraft`: aviones reales sobre EE. UU. desde OpenSky (OAuth2 o anónimo, según el `.env`), con caché en memoria. Si OpenSky va lento, se responde al instante con el último dato y se refresca en segundo plano (tope de 45 s por descarga).
 - `GET /api/aircraft/:icao24`: un avión concreto, con validación Zod. Se busca primero en la lista ya en caché, así que no gasta créditos de OpenSky.
 - `GET /api/aircraft/:icao24/details`: avión, ruta, progreso y ETA para el panel (adsbdb + cálculo propio).
 - `GET /api/aircraft/:icao24/schedule`: ruta real, horarios, retraso, terminal y puerta bajo demanda (Aviationstack + hexdb).
