@@ -1,0 +1,152 @@
+// Modelo de datos (ver CONTEXTO.md, secciones 3, 4 y 6)
+// Migraciones en ../migrations; se crean con `npm run db:migrate`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENT
+  STAFF
+}
+
+enum FlightStatus {
+  SCHEDULED
+  DEPARTED
+  LANDED
+  CANCELLED
+}
+
+// Manuales (Staff): RECEIVED, LOADED, UNLOADED, DELIVERED. Automático: IN_FLIGHT
+enum ShipmentStatus {
+  RECEIVED
+  LOADED
+  IN_FLIGHT
+  UNLOADED
+  DELIVERED
+}
+
+// Historial del paquete. TOOK_OFF, LANDED y ALERT los genera el sistema con los datos del avión
+enum TrackingEventType {
+  RECEIVED
+  LOADED
+  TOOK_OFF
+  LANDED
+  UNLOADED
+  DELIVERED
+  ALERT
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  /// Hash Argon2id; nunca la contraseña en texto plano
+  passwordHash String
+  name         String
+  role         Role     @default(CLIENT)
+  /// Solo Staff: limita su alcance a un aeropuerto (opcional)
+  airportId    String?
+  airport      Airport? @relation(fields: [airportId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  shipments Shipment[]
+  events    TrackingEvent[]
+}
+
+model Airport {
+  id        String  @id @default(uuid())
+  iataCode  String  @unique @db.Char(3)
+  icaoCode  String  @unique @db.Char(4)
+  name      String
+  city      String
+  lat       Float
+  lng       Float
+  /// Zona horaria IANA, por ejemplo "America/New_York"
+  timezone  String
+
+  departures Flight[]        @relation("FlightOrigin")
+  arrivals   Flight[]        @relation("FlightDestination")
+  staff      User[]
+  events     TrackingEvent[]
+}
+
+model Flight {
+  id                 String       @id @default(uuid())
+  /// Número comercial, por ejemplo "AA3304"
+  flightNumber       String
+  /// Indicativo ATC, por ejemplo "AAL3304"; sirve para encontrar el avión la primera vez
+  callsign           String?
+  /// Avión asignado por el Staff; OpenSky filtra por este código
+  aircraftIcao24     String?      @db.Char(6)
+  originId           String
+  origin             Airport      @relation("FlightOrigin", fields: [originId], references: [id])
+  destinationId      String
+  destination        Airport      @relation("FlightDestination", fields: [destinationId], references: [id])
+  scheduledDeparture DateTime
+  scheduledArrival   DateTime
+  status             FlightStatus @default(SCHEDULED)
+
+  // Último estado conocido del avión; se guarda cada 30-60 s o al cambiar de estado, no en cada ciclo
+  lastKnownLat      Float?
+  lastKnownLng      Float?
+  lastKnownHdg      Float?
+  lastKnownSpd      Float?
+  lastKnownAlt      Float?
+  lastKnownOnGround Boolean?
+  lastKnownAt       DateTime?
+
+  /// Bloqueo optimista: se incrementa en cada actualización
+  version   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shipments Shipment[]
+
+  @@unique([flightNumber, scheduledDeparture])
+  @@index([aircraftIcao24])
+  @@index([status])
+}
+
+model Shipment {
+  id           String         @id @default(uuid())
+  /// Código que ve el cliente, por ejemplo "DT-8F3K2Q"
+  trackingCode String         @unique
+  description  String
+  weightKg     Decimal        @db.Decimal(8, 2)
+  ownerId      String
+  owner        User           @relation(fields: [ownerId], references: [id])
+  flightId     String?
+  flight       Flight?        @relation(fields: [flightId], references: [id])
+  status       ShipmentStatus @default(RECEIVED)
+  /// Bloqueo optimista: se incrementa en cada cambio de estado
+  version      Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  events TrackingEvent[]
+
+  @@index([ownerId])
+  @@index([flightId, status])
+}
+
+model TrackingEvent {
+  id          String            @id @default(uuid())
+  shipmentId  String
+  shipment    Shipment          @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  type        TrackingEventType
+  occurredAt  DateTime          @default(now())
+  note        String?
+  airportId   String?
+  airport     Airport?          @relation(fields: [airportId], references: [id])
+  /// Staff que lo registró; null = evento automático
+  createdById String?
+  createdBy   User?             @relation(fields: [createdById], references: [id])
+
+  @@index([shipmentId, occurredAt])
+}
