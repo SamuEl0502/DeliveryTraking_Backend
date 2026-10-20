@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: delivery
       POSTGRES_DB: delivery_tracking
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

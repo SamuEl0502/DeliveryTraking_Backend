@@ -138,7 +138,7 @@ model Shipment {
 model TrackingEvent {
   id          String            @id @default(uuid())
   shipmentId  String
-  shipment    Shipment          @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  shipment    Shipment          @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
   type        TrackingEventType
   occurredAt  DateTime          @default(now())
   note        String?

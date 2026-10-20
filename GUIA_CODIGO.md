@@ -478,3 +478,13 @@ Seguimos un avión desde OpenSky hasta el JSON que recibe el cliente con `GET /a
 | Usar datos grabados si OpenSky falla | `USE_FIXTURE=true` en `.env`; para regrabar: `npm run fixture:save`. |
 | Cambiar el timeout de OpenSky | `TIMEOUT_MS` en `providers/openSky.provider.ts`. |
 | Cambiar qué responde `/health` | `getHealth` en `controllers/health.controller.ts`. |
+
+## 11. Base de datos
+
+| Archivo | Qué hace |
+|---|---|
+| `docker-compose.yml` (raíz) | PostgreSQL 17 para desarrollo. Publica el puerto solo en `127.0.0.1`. |
+| `backend/prisma.config.ts` | Indica a Prisma dónde están el esquema, las migraciones y el seed. Carga `.env` con dotenv. |
+| `backend/models/schema.prisma` | Modelos User, Airport, Flight, Shipment y TrackingEvent. Un envío con eventos no se puede borrar (`onDelete: Restrict`). |
+| `backend/migrations/` | Migración SQL inicial generada desde el esquema. |
+| `backend/scripts/seed.ts` | Carga 5 aeropuertos con upsert, así que se puede ejecutar varias veces. |

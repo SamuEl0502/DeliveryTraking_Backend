@@ -41,6 +41,19 @@ curl.exe -i http://localhost:3000/health
 Invoke-RestMethod http://localhost:3000/api/aircraft | Select-Object count
 ```
 
+## Base de datos (PostgreSQL)
+
+El backend usa PostgreSQL 17 con Prisma. Requiere Docker Desktop en marcha.
+
+```powershell
+cd backend
+npm run db:up        # levanta PostgreSQL en 127.0.0.1:5432 (docker-compose.yml de la raíz)
+npm run db:deploy    # aplica las migraciones de migrations/
+npm run db:seed      # carga 5 aeropuertos (puede repetirse sin duplicar)
+```
+
+Para cambiar el esquema en desarrollo: editar `models/schema.prisma` y ejecutar `npm run db:migrate`. La base de datos solo escucha en el propio equipo; no la expongas a la red.
+
 ## Variables de entorno
 
 Definidas en [`backend/.env.example`](backend/.env.example). El servidor las valida con Zod al arrancar y no inicia si alguna es inválida. `.env` nunca se sube a Git.
@@ -132,7 +145,7 @@ routes/ -> (validate) -> controllers/ -> services/ -> providers/ | repositories/
 validators/          esquemas Zod
 types/  utils/       contratos (AircraftState), AppError, caché TTL
 fixtures/  scripts/  respuesta real de OpenSky y script para regenerarla
-models/  repositories/  migrations/  websocket/   reservadas para próximas entregas
+models/ (Prisma)  migrations/  seed: scripts/seed.ts   repositories/  websocket/   reservadas para próximas entregas
 ```
 
 Más detalle: [`backend/EXPLICACION.md`](backend/EXPLICACION.md) (resumen y preguntas frecuentes) y [`GUIA_CODIGO.md`](GUIA_CODIGO.md) (archivo por archivo).
