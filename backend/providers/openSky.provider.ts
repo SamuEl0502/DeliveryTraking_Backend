@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { env } from '../config/env.ts';
 import { logger } from '../config/logger.ts';
 import { AppError } from '../utils/AppError.ts';
-import type { AircraftSnapshot, AircraftState } from '../types/aircraft.ts';
+import type { AircraftSnapshot, AircraftState, FlightTrack, TrackPoint } from '../types/aircraft.ts';
 import { typeOf } from './aircraftDb.provider.ts';
 
 // Fuente: https://openskynetwork.github.io/opensky-api/rest.html
@@ -42,6 +42,12 @@ const F = {
 const statesResponseSchema = z.object({
   time: z.number(),
   states: z.array(z.array(z.unknown())).nullable(),
+});
+
+const trackResponseSchema = z.object({
+  icao24: z.string(),
+  callsign: z.string().nullish(),
+  path: z.array(z.array(z.unknown())),
 });
 
 const tokenResponseSchema = z.object({
@@ -82,13 +88,23 @@ async function getToken(forceRefresh = false): Promise<string | null> {
   }
 }
 
-async function requestStates(params: Record<string, string | number>): Promise<unknown> {
+function requestStates(params: Record<string, string | number>): Promise<unknown> {
+  return request('/states/all', params, STATES_DEADLINE_MS);
+}
+
+// Devuelve null con 404 (OpenSky no tiene ese dato)
+async function request(path: string, params: Record<string, string | number>, deadlineMs: number): Promise<unknown> {
   const call = async (forceRefresh: boolean) => {
     const accessToken = await getToken(forceRefresh);
     // timeout de Axios solo mide silencio: si OpenSky envía la respuesta a goteo, la señal corta el total
-    const config: AxiosRequestConfig = { params, signal: AbortSignal.timeout(STATES_DEADLINE_MS) };
+    const config: AxiosRequestConfig = {
+      params,
+      signal: AbortSignal.timeout(deadlineMs),
+      validateStatus: (s) => (s >= 200 && s < 300) || s === 404,
+    };
     if (accessToken) config.headers = { Authorization: `Bearer ${accessToken}` };
-    const res = await http.get('/states/all', config);
+    const res = await http.get(path, config);
+    if (res.status === 404) return null;
     const remaining = res.headers['x-rate-limit-remaining'];
     if (remaining !== undefined) logger.debug({ remaining }, 'OpenSky credits remaining');
     return res.data as unknown;
@@ -196,4 +212,29 @@ export async function fetchByIcao24(icao24: string): Promise<AircraftState | nul
   }
   const snapshot = toSnapshot(await requestStates({ icao24 }));
   return snapshot.aircraft[0] ?? null;
+}
+
+/** Convierte la respuesta de /tracks; descarta los puntos sin posición */
+export function toTrack(raw: unknown): FlightTrack {
+  const parsed = trackResponseSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new AppError(502, 'OPENSKY_BAD_RESPONSE', 'OpenSky devolvió un formato inesperado');
+  }
+  const path = parsed.data.path
+    .map((p): TrackPoint | null => {
+      const ts = num(p[0]);
+      const lat = num(p[1]);
+      const lng = num(p[2]);
+      if (ts === null || lat === null || lng === null) return null;
+      return { ts, lat, lng, alt: num(p[3]), hdg: num(p[4]), onGround: p[5] === true };
+    })
+    .filter((p): p is TrackPoint => p !== null);
+  return { icao24: parsed.data.icao24, callsign: parsed.data.callsign?.trim() || null, path };
+}
+
+/** Recorrido del vuelo en curso (time=0). 4 créditos de su propia cuenta; OpenSky lo marca como experimental */
+export async function fetchTrack(icao24: string): Promise<FlightTrack | null> {
+  if (env.USE_FIXTURE) return null;
+  const raw = await request('/tracks/all', { icao24, time: 0 }, TIMEOUT_MS);
+  return raw === null ? null : toTrack(raw);
 }

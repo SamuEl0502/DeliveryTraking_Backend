@@ -75,6 +75,8 @@ Restricciones: los datos de rutas de adsbdb no se pueden copiar a otra base de d
 
 La ruta de adsbdb es la asignada al indicativo y en vivo acierta poco (7 de 25 vuelos en una prueba), porque las aerolíneas reutilizan números de vuelo. La de Aviationstack es la del tramo que el avión vuela ahora, así que `/schedule` la devuelve para reemplazar a la de `/details`.
 
+Si el recorrido de OpenSky empieza en tierra o a menos de 1.500 m, su primer punto es el despegue real. En ese caso la ruta de adsbdb solo se acepta si su origen está a menos de 30 km de ese punto y el avión apunta al destino. Un desvío por clima ya no la invalida, y un origen distinto sí. En una prueba con 20 vuelos se confirmaron 5: en los demás, adsbdb tenía otro tramo del mismo número de vuelo.
+
 La base de aeronaves de Mictronics se publica, según tar1090-db y proyectos que la usan, con licencia ODC-By 1.0, que exige citar la fuente (pendiente de confirmar en la web de Mictronics, que no respondió).
 
 ## API
@@ -87,6 +89,7 @@ Todas las respuestas son JSON y llevan el header `x-correlation-id`. Las rutas b
 | `GET /api/aircraft` | `{ time, count, aircraft: AircraftState[] }` con los aviones sobre EE. UU. continental |
 | `GET /api/aircraft/:icao24` | Un `AircraftState`. `icao24` son 6 caracteres hexadecimales (se aceptan mayúsculas). |
 | `GET /api/aircraft/:icao24/details` | `{ state, aircraft, route, progress }` para el panel del avión. No gasta Aviationstack. |
+| `GET /api/aircraft/:icao24/track` | `{ icao24, callsign, path: TrackPoint[] }`: recorrido del vuelo actual desde el despegue, con altitud en cada punto, para la estela por colores. 4 créditos de OpenSky de su propia cuenta y caché de 1 min. 404 `TRACK_NOT_FOUND` si OpenSky no lo tiene. |
 | `GET /api/aircraft/:icao24/schedule` | `{ flightNumber, airline, status, departure, arrival, route, progress, source }`. Única ruta que gasta Aviationstack. |
 
 `AircraftState` ([`backend/types/aircraft.ts`](backend/types/aircraft.ts)):

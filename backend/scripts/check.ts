@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { localToIso, toActiveFlight } from '../providers/aviationStack.provider.ts';
 import { parseAircraftDb } from '../providers/aircraftDb.provider.ts';
 import { TtlCache } from '../utils/ttlCache.ts';
-import { bearingDeg, computeProgress, distanceKm } from '../services/flightDetails.service.ts';
+import { toTrack } from '../providers/openSky.provider.ts';
+import { bearingDeg, computeProgress, distanceKm, takeoffOf } from '../services/flightDetails.service.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 
 // Prueba rápida del panel (geometría y elección del vuelo de Aviationstack): npm run check
@@ -90,5 +91,28 @@ assert.equal(await cache.getOrLoad('k', async () => 3, silent), 2);
 const db = parseAircraftDb('A0F1BB;N160AN;A321;00;AIRBUS A-321;2016;AMERICAN AIRLINES INC;\n000001;;;10;;;Miscode - VARIOUS;\n');
 assert.equal(db.get('a0f1bb'), 'A321');
 assert.equal(db.size, 1);
+
+// Recorrido real de SWA2107 (despegue en Phoenix); el punto sin posición se descarta
+const track = toTrack({
+  icao24: 'ad694c',
+  callsign: 'SWA2107 ',
+  path: [
+    [1792539658, 33.4311, -112.0174, 304, 90, false],
+    [1792539699, null, null, 609, 89, false],
+    [1792539752, 33.4329, -111.9222, 1219, 88, false],
+  ],
+});
+assert.equal(track.callsign, 'SWA2107');
+assert.equal(track.path.length, 2);
+assert.deepEqual(takeoffOf(track), track.path[0]);
+// Si OpenSky empezó a verlo en crucero, no hay despegue
+assert.equal(takeoffOf({ ...track, path: [{ ...track.path[0]!, alt: 11000 }] }), null);
+
+// Desvío fuerte (sobre Kentucky, ORD-BOS): sin despegue no encaja; despegando de ORD sí
+const detour = plane(37.8, -84.3);
+assert.equal(computeProgress(detour, route).verified, false);
+assert.equal(computeProgress(detour, route, { lat: 41.97, lng: -87.9 }).verified, true);
+// Despegó de otro aeropuerto (Denver): la ruta de adsbdb es de otro tramo aunque la geometría encaje
+assert.equal(computeProgress(plane(42.2, -79.5), route, { lat: 39.86, lng: -104.67 }).verified, false);
 
 console.log('check OK');

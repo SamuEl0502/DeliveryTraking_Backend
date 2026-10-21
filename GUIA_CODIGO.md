@@ -255,6 +255,7 @@ No tienen `try/catch`: Express 5 envía al `errorHandler` cualquier error de una
 | `boxCache` | — | `TtlCache<AircraftSnapshot>` | Caché de la lista completa, con TTL `OPENSKY_CACHE_TTL_MS`. | `getUsAircraft` |
 | `singleCache` | — | `TtlCache<AircraftState \| null>` | Caché de aviones individuales, uno por `icao24`. | `getAircraftByIcao24` |
 | `getUsAircraft(log)` | logger de la petición | `Promise<AircraftSnapshot>` | Busca en la caché con la clave `"us"`; si no hay dato fresco, llama a `openSky.fetchByBox(US_BOX)`. | `listAircraft` |
+| `findTrack(icao24, log)` / `getTrack(icao24, log)` | código del avión y logger | `FlightTrack \| null` / `FlightTrack` | Recorrido con caché de 1 min (`trackCache`), compartida entre `/details` y `/track`. `findTrack` nunca lanza; `getTrack` lanza 404 `TRACK_NOT_FOUND`. | `getDetails`, `getAircraftTrack` |
 | `getAircraftByIcao24(icao24, log)` | código del avión y logger | `Promise<AircraftState>` | Busca en la caché con la clave `icao24`; si no hay dato, llama a `openSky.fetchByIcao24`. Si el resultado es `null`, lanza `AppError(404, 'AIRCRAFT_NOT_FOUND')`. | `getAircraft` |
 
 Nota: un "no encontrado" (`null`) también se guarda en la caché durante el TTL. Mientras dure, preguntar otra vez por ese avión responde 404 sin llamar a OpenSky.
@@ -297,6 +298,8 @@ Al cargar el archivo se escribe el log `"OpenSky provider mode"` con el modo: `f
 | `readFixture()` | nada | `Promise<unknown>` | Lee y parsea `fixtures/opensky-sample.json`. Si no puede, lanza 500 `FIXTURE_MISSING`. | `fetchByBox`, `fetchByIcao24` (solo con `USE_FIXTURE=true`) |
 | `fetchRawByBox(box)` | caja geográfica | `Promise<unknown>` | Pide los estados de esa caja, sin convertirlos. | `fetchByBox`, `scripts/saveFixture.ts` |
 | `fetchByBox(box)` | caja geográfica | `Promise<AircraftSnapshot>` | Con `USE_FIXTURE` lee el archivo; si no, llama a OpenSky. En ambos casos convierte con `toSnapshot`. | `getUsAircraft` (service) |
+| `fetchTrack(icao24)` | código del avión | `Promise<FlightTrack \| null>` | `GET /tracks/all?time=0`: recorrido del vuelo en curso. OpenSky lo marca como experimental. 404 = `null`; con `USE_FIXTURE`, siempre `null`. | `findTrack` (service) |
+| `toTrack(raw)` | respuesta de `/tracks` | `FlightTrack` | Valida con Zod y convierte cada punto `[time, lat, lon, alt, track, on_ground]` en `TrackPoint`; descarta los que no tienen posición. | `fetchTrack`, `check.ts` |
 | `fetchByIcao24(icao24)` | código del avión | `Promise<AircraftState \| null>` | Con `USE_FIXTURE` busca el avión en el archivo; si no, consulta a OpenSky con `?icao24=`. Devuelve el avión o `null`. | `getAircraftByIcao24` (service) |
 
 ---
@@ -312,7 +315,8 @@ Al cargar el archivo se escribe el log `"OpenSky provider mode"` con el modo: `f
 | `airportCache` | — | `TtlCache` | Caché de 30 días de las coordenadas de los aeropuertos (hexdb). | `getAirport` |
 | `distanceKm(a, b)` | dos puntos `{ lat, lng }` | km | Distancia sobre la Tierra con la fórmula de haversine. | `computeProgress`, `check.ts` |
 | `bearingDeg(a, b)` | dos puntos | grados | Rumbo inicial de `a` hacia `b`. | `computeProgress`, `check.ts` |
-| `computeProgress(state, route)` | avión y ruta | `{ progress, verified }` | Calcula km totales, recorridos y restantes, % y ETA (km restantes / velocidad). `totalKm` es recorrido + restante, para que el % cuadre. `verified` es `false` si el desvío pasa de 1,2 o si el rumbo se aleja más de 90° del destino (esto último no se exige a menos de 100 km del destino). | `getDetails`, `getSchedule`, `check.ts` |
+| `takeoffOf(track)` | recorrido o `null` | punto o `null` | Primer punto del recorrido si está en tierra o a menos de 1.500 m (el despegue). Si OpenSky empezó a ver el avión ya en vuelo, `null`. | `getDetails`, `check.ts` |
+| `computeProgress(state, route, takeoff?)` | avión, ruta y despegue opcional | `{ progress, verified }` | Calcula km totales, recorridos y restantes, % y ETA (km restantes / velocidad). `totalKm` es recorrido + restante, para que el % cuadre. Con despegue, `verified` exige que el origen esté a menos de 30 km de él y que el rumbo apunte al destino. Sin despegue, `verified` es `false` si el desvío pasa de 1,2 o si el rumbo se aleja más de 90° del destino (esto último no se exige a menos de 100 km del destino). | `getDetails`, `getSchedule`, `check.ts` |
 | `getDetails(icao24, log)` | código del avión y logger | `Promise<AircraftDetails>` | Toma el avión de OpenSky (de la caché), pide a adsbdb el avión y la ruta en paralelo, y calcula el progreso. Si adsbdb falla, devuelve `null` en esas partes sin cortar la respuesta. | `getAircraftDetails` |
 | `getSchedule(icao24, log)` | código del avión y logger | `Promise<FlightSchedule>` | Con el indicativo pide a Aviationstack el tramo activo, completa las coordenadas de los aeropuertos con hexdb y calcula la ruta real y el progreso con la posición actual. Sin indicativo o sin vuelo activo, lanza 404 `SCHEDULE_NOT_FOUND`. | `getAircraftSchedule` |
 

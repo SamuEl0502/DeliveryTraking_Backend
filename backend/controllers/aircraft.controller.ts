@@ -22,3 +22,8 @@ export async function getAircraftDetails(req: Request<{ icao24: string }>, res: 
 export async function getAircraftSchedule(req: Request<{ icao24: string }>, res: Response): Promise<void> {
   res.json(await flightDetailsService.getSchedule(req.params.icao24, req.log));
 }
+
+// Recorrido desde el despegue para la estela con colores por altitud (4 créditos de OpenSky, caché de 1 min)
+export async function getAircraftTrack(req: Request<{ icao24: string }>, res: Response): Promise<void> {
+  res.json(await aircraftService.getTrack(req.params.icao24, req.log));
+}
