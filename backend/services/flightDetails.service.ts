@@ -2,7 +2,7 @@ import type { Logger } from 'pino';
 import * as adsbdb from '../providers/adsbdb.provider.ts';
 import * as aviationStack from '../providers/aviationStack.provider.ts';
 import * as hexdb from '../providers/hexdb.provider.ts';
-import type { AircraftState, FlightTrack } from '../types/aircraft.ts';
+import type { AircraftState } from '../types/aircraft.ts';
 import type {
   AircraftDetails,
   AircraftInfo,
@@ -13,7 +13,7 @@ import type {
 } from '../types/flightDetails.ts';
 import { AppError } from '../utils/AppError.ts';
 import { TtlCache } from '../utils/ttlCache.ts';
-import { findTrack, getAircraftByIcao24 } from './aircraft.service.ts';
+import { findTrack, getAircraftByIcao24, takeoffOf } from './aircraft.service.ts';
 
 // Quién responde qué en el panel del avión seleccionado:
 //   OpenSky     -> posición, altitud, velocidad, rumbo (ya en caché por el mapa)
@@ -32,8 +32,7 @@ const MAX_DETOUR = 1.2;
 // ...y el avión apunta hacia el destino (no se exige cerca de llegar: en la aproximación da vueltas)
 const MAX_HEADING_OFF_DEG = 90;
 const HEADING_CHECK_MIN_KM = 100;
-// Si el recorrido empieza en tierra o bajo, ese punto es el despegue: el origen debe estar a menos de 30 km
-const TAKEOFF_MAX_ALT_M = 1_500;
+// Con el despegue visto en el recorrido, el origen debe estar a menos de 30 km de él
 const TAKEOFF_MATCH_KM = 30;
 
 const aircraftCache = new TtlCache<AircraftInfo | null>(STATIC_TTL_MS);
@@ -65,13 +64,6 @@ function headsToDestination(state: AircraftState, destination: { lat: number; ln
   if (state.hdg === null || state.onGround || remainingKm < HEADING_CHECK_MIN_KM) return true;
   const off = Math.abs(bearingDeg(state, destination) - state.hdg) % 360;
   return Math.min(off, 360 - off) <= MAX_HEADING_OFF_DEG;
-}
-
-/** Punto de despegue según el recorrido, o null si OpenSky empezó a verlo ya en vuelo */
-export function takeoffOf(track: FlightTrack | null): { lat: number; lng: number } | null {
-  const first = track?.path[0];
-  if (!first || (!first.onGround && (first.alt === null || first.alt > TAKEOFF_MAX_ALT_M))) return null;
-  return first;
 }
 
 export function computeProgress(
@@ -109,7 +101,9 @@ export async function getDetails(icao24: string, log: Logger): Promise<AircraftD
   const callsign = state.callsign;
 
   // En paralelo; si adsbdb falla, el panel igual muestra los datos en vivo
-  const [aircraft, rawRoute, track] = await Promise.all([
+  // El recorrido (OpenSky) va en paralelo con adsbdb; sirve para confirmar el origen
+  const trackPromise = findTrack(icao24, log);
+  const [aircraft, rawRoute] = await Promise.all([
     aircraftCache.getOrLoad(icao24, () => adsbdb.fetchAircraftInfo(icao24), log).catch((err: unknown) => {
       log.warn({ err }, 'aircraft info unavailable');
       return null;
@@ -120,11 +114,10 @@ export async function getDetails(icao24: string, log: Logger): Promise<AircraftD
           return null;
         })
       : null,
-    findTrack(icao24, log),
   ]);
 
   if (!rawRoute) return { state, aircraft, route: null, progress: null };
-  const { progress, verified } = computeProgress(state, rawRoute, takeoffOf(track));
+  const { progress, verified } = computeProgress(state, rawRoute, takeoffOf(await trackPromise));
   // Con una ruta que no encaja, el progreso y el ETA serían inventados: mejor no darlos
   return { state, aircraft, route: { ...rawRoute, verified }, progress: verified ? progress : null };
 }

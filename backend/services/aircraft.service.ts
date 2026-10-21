@@ -12,6 +12,8 @@ const boxCache = new TtlCache<AircraftSnapshot>(env.OPENSKY_CACHE_TTL_MS);
 const singleCache = new TtlCache<AircraftState | null>(env.OPENSKY_CACHE_TTL_MS);
 // El recorrido crece poco en 1 min; el panel y el mapa lo piden casi a la vez y comparten esta caché
 const trackCache = new TtlCache<FlightTrack | null>(60_000);
+// Si el recorrido empieza en tierra o por debajo de 1.500 m, ese primer punto es el despegue
+const TAKEOFF_MAX_ALT_M = 1_500;
 
 export function getUsAircraft(log: Logger): Promise<AircraftSnapshot> {
   return boxCache.getOrLoad('us', () => openSky.fetchByBox(US_BOX), log);
@@ -41,4 +43,11 @@ export async function getTrack(icao24: string, log: Logger): Promise<FlightTrack
   const track = await findTrack(icao24, log);
   if (!track) throw new AppError(404, 'TRACK_NOT_FOUND', `No hay recorrido para el avión ${icao24}`);
   return track;
+}
+
+/** Punto de despegue según el recorrido, o null si OpenSky empezó a verlo ya en vuelo */
+export function takeoffOf(track: FlightTrack | null): { lat: number; lng: number } | null {
+  const first = track?.path[0];
+  if (!first || (!first.onGround && (first.alt === null || first.alt > TAKEOFF_MAX_ALT_M))) return null;
+  return first;
 }

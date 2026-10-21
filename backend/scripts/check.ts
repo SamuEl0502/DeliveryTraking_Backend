@@ -4,7 +4,8 @@ import { localToIso, toActiveFlight } from '../providers/aviationStack.provider.
 import { parseAircraftDb } from '../providers/aircraftDb.provider.ts';
 import { TtlCache } from '../utils/ttlCache.ts';
 import { toTrack } from '../providers/openSky.provider.ts';
-import { bearingDeg, computeProgress, distanceKm, takeoffOf } from '../services/flightDetails.service.ts';
+import { takeoffOf } from '../services/aircraft.service.ts';
+import { bearingDeg, computeProgress, distanceKm } from '../services/flightDetails.service.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 
 // Prueba rápida del panel (geometría y elección del vuelo de Aviationstack): npm run check
