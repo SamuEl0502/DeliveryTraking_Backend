@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { localToIso, toActiveFlight } from '../providers/aviationStack.provider.ts';
+import { parseAircraftDb } from '../providers/aircraftDb.provider.ts';
 import { TtlCache } from '../utils/ttlCache.ts';
 import { bearingDeg, computeProgress, distanceKm } from '../services/flightDetails.service.ts';
 import type { AircraftState } from '../types/aircraft.ts';
@@ -16,7 +17,7 @@ const route = {
   destination: { icao: 'KBOS', iata: 'BOS', name: 'Logan', city: 'Boston', ...bos },
 };
 const plane = (lat: number, lng: number, spd: number | null = 230): AircraftState => ({
-  icao24: 'a39bfa', callsign: 'UAL1855', lat, lng, hdg: 90, spd, alt: 11000, onGround: false, ts: 0,
+  icao24: 'a39bfa', callsign: 'UAL1855', lat, lng, hdg: 90, spd, alt: 11000, onGround: false, type: 'B738', ts: 0,
 });
 
 // ORD-BOS son ~1390 km
@@ -84,5 +85,10 @@ await new Promise((r) => setTimeout(r, 0));
 assert.equal(await cache.getOrLoad('k', () => Promise.reject(new Error('caída')), silent), 2);
 await new Promise((r) => setTimeout(r, 0));
 assert.equal(await cache.getOrLoad('k', async () => 3, silent), 2);
+
+// Base de aeronaves: icao24 en minúsculas -> tipo; las filas sin tipo se ignoran
+const db = parseAircraftDb('A0F1BB;N160AN;A321;00;AIRBUS A-321;2016;AMERICAN AIRLINES INC;\n000001;;;10;;;Miscode - VARIOUS;\n');
+assert.equal(db.get('a0f1bb'), 'A321');
+assert.equal(db.size, 1);
 
 console.log('check OK');
