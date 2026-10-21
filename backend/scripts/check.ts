@@ -5,7 +5,8 @@ import { parseAircraftDb } from '../providers/aircraftDb.provider.ts';
 import { TtlCache } from '../utils/ttlCache.ts';
 import { toTrack } from '../providers/openSky.provider.ts';
 import { takeoffOf } from '../services/aircraft.service.ts';
-import { bearingDeg, computeProgress, distanceKm } from '../services/flightDetails.service.ts';
+import { parseAirports, splitCsvLine } from '../providers/airportDb.provider.ts';
+import { bearingDeg, computeProgress, distanceKm, nearestAirport, resolveRoute } from '../services/flightDetails.service.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 
 // Prueba rápida del panel (geometría y elección del vuelo de Aviationstack): npm run check
@@ -115,5 +116,43 @@ assert.equal(computeProgress(detour, route).verified, false);
 assert.equal(computeProgress(detour, route, { lat: 41.97, lng: -87.9 }).verified, true);
 // Despegó de otro aeropuerto (Denver): la ruta de adsbdb es de otro tramo aunque la geometría encaje
 assert.equal(computeProgress(plane(42.2, -79.5), route, { lat: 39.86, lng: -104.67 }).verified, false);
+
+// CSV de OurAirports: comas y comillas dentro de un campo; solo aeropuertos grandes y medianos con vuelos regulares
+assert.deepEqual(splitCsvLine('1,"a, b","x ""y"""'), ['1', 'a, b', 'x "y"']);
+const airportList = parseAirports(
+  [
+    '"id","ident","type","name","latitude_deg","longitude_deg","elevation_ft","continent","iso_country","iso_region","municipality","scheduled_service","icao_code","iata_code"',
+    '3632,"KLAX","large_airport","Los Angeles International Airport",33.942501,-118.407997,125,"NA","US","US-CA","Los Angeles","yes","KLAX","LAX"',
+    '3384,"KDFW","large_airport","Dallas Fort Worth International Airport",32.896801,-97.038002,607,"NA","US","US-TX","Dallas-Fort Worth","yes","KDFW","DFW"',
+    '9,"KSMO","medium_airport","Santa Monica Municipal Airport",34.0158,-118.4513,177,"NA","US","US-CA","Santa Monica","no","KSMO","SMO"',
+  ].join('\n'),
+);
+assert.deepEqual(airportList.map((a) => a.iata), ['LAX', 'DFW']);
+const [lax, dfw] = airportList as [(typeof airportList)[number], (typeof airportList)[number]];
+// Primer punto real del recorrido de DAL803, junto a DFW; lejos de todo, ninguno
+assert.equal(nearestAirport({ lat: 32.9099, lng: -97.0547 }, airportList)?.iata, 'DFW');
+assert.equal(nearestAirport({ lat: 36, lng: -100 }, airportList), null);
+
+// DAL803 real: adsbdb dice LAX→SEA, despegó de DFW y vuela en Washington hacia Seattle -> DFW→SEA estimada
+const sea = { icao: 'KSEA', iata: 'SEA', name: 'Seattle-Tacoma', city: 'Seattle', lat: 47.449, lng: -122.309 };
+const dal803 = { callsign: 'DAL803', flightNumber: 'DL803', airline: null, origin: lax, destination: sea };
+const overWashington = { ...plane(46.3744, -120.0991), callsign: 'DAL803', hdg: 300 };
+const resolved = resolveRoute(overWashington, dal803, { lat: 32.9099, lng: -97.0547 }, dfw);
+assert.equal(resolved.route.estimated, true);
+assert.equal(resolved.route.origin.iata, 'DFW');
+assert.ok(resolved.progress !== null && resolved.progress.percent > 85);
+// DAL776 real: adsbdb dice BOS→DEN, despegó de Miami y va al norte frente a Carolina del Norte -> MIA→DEN tiene
+// un desvío de 1,23: ni confirmada ni estimada
+const mia = { icao: 'KMIA', iata: 'MIA', name: 'Miami', city: 'Miami', lat: 25.7932, lng: -80.2906 };
+const den = { icao: 'KDEN', iata: 'DEN', name: 'Denver', city: 'Denver', lat: 39.8617, lng: -104.6731 };
+const dal776 = resolveRoute(
+  { ...plane(33.2506, -77.5606), hdg: 28 },
+  { callsign: 'DAL776', flightNumber: 'DL776', airline: null, origin: route.destination, destination: den },
+  { lat: 25.8021, lng: -80.2623 },
+  mia,
+);
+assert.equal(dal776.route.verified, false);
+assert.equal(dal776.route.estimated, false);
+assert.equal(dal776.progress, null);
 
 console.log('check OK');

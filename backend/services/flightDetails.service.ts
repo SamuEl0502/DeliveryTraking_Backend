@@ -1,6 +1,7 @@
 import type { Logger } from 'pino';
 import * as adsbdb from '../providers/adsbdb.provider.ts';
 import * as aviationStack from '../providers/aviationStack.provider.ts';
+import { allAirports } from '../providers/airportDb.provider.ts';
 import * as hexdb from '../providers/hexdb.provider.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 import type {
@@ -10,6 +11,7 @@ import type {
   FlightProgress,
   FlightRoute,
   FlightSchedule,
+  RawRoute,
 } from '../types/flightDetails.ts';
 import { AppError } from '../utils/AppError.ts';
 import { TtlCache } from '../utils/ttlCache.ts';
@@ -34,9 +36,11 @@ const MAX_HEADING_OFF_DEG = 90;
 const HEADING_CHECK_MIN_KM = 100;
 // Con el despegue visto en el recorrido, el origen debe estar a menos de 30 km de él
 const TAKEOFF_MATCH_KM = 30;
+// El primer punto del recorrido puede estar ya fuera de la pista: se busca el aeropuerto a menos de 15 km
+const DEPARTURE_MAX_KM = 15;
 
 const aircraftCache = new TtlCache<AircraftInfo | null>(STATIC_TTL_MS);
-const routeCache = new TtlCache<Omit<FlightRoute, 'verified'> | null>(STATIC_TTL_MS);
+const routeCache = new TtlCache<RawRoute | null>(STATIC_TTL_MS);
 const scheduleCache = new TtlCache<aviationStack.ActiveFlight | null>(SCHEDULE_TTL_MS);
 const airportCache = new TtlCache<Airport | null>(AIRPORT_TTL_MS);
 
@@ -66,9 +70,49 @@ function headsToDestination(state: AircraftState, destination: { lat: number; ln
   return Math.min(off, 360 - off) <= MAX_HEADING_OFF_DEG;
 }
 
+/** Aeropuerto regular más cercano a un punto, si está a menos de maxKm */
+export function nearestAirport(
+  point: { lat: number; lng: number },
+  airports: readonly Airport[],
+  maxKm = DEPARTURE_MAX_KM,
+): Airport | null {
+  let best: Airport | null = null;
+  let bestKm = maxKm;
+  for (const a of airports) {
+    // Descarte rápido: 1° de latitud son ~111 km
+    if (Math.abs(a.lat - point.lat) > 1) continue;
+    const km = distanceKm(point, a);
+    if (km <= bestKm) {
+      best = a;
+      bestKm = km;
+    }
+  }
+  return best;
+}
+
+/** Elige la ruta del panel: la de adsbdb si encaja; si no, el despegue real con el destino de adsbdb si ese tramo encaja */
+export function resolveRoute(
+  state: AircraftState,
+  raw: RawRoute,
+  takeoff: { lat: number; lng: number } | null,
+  departure: Airport | null,
+): { route: FlightRoute; progress: FlightProgress | null } {
+  const direct = computeProgress(state, raw, takeoff);
+  if (direct.verified) return { route: { ...raw, verified: true, estimated: false }, progress: direct.progress };
+  // adsbdb trae otro tramo del mismo número de vuelo. Sin el despegue en el cálculo: así se exige que el
+  // tramo despegue→destino no tenga desvío, y un destino cualquiera que solo quede "por delante" no pasa
+  if (departure && departure.icao !== raw.origin.icao) {
+    const guess = { ...raw, origin: departure };
+    const g = computeProgress(state, guess);
+    if (g.verified) return { route: { ...guess, verified: true, estimated: true }, progress: g.progress };
+  }
+  // Con una ruta que no encaja, el progreso y el ETA serían inventados: mejor no darlos
+  return { route: { ...raw, verified: false, estimated: false }, progress: null };
+}
+
 export function computeProgress(
   state: AircraftState,
-  route: Omit<FlightRoute, 'verified'>,
+  route: RawRoute,
   takeoff: { lat: number; lng: number } | null = null,
 ): { progress: FlightProgress; verified: boolean } {
   const directKm = distanceKm(route.origin, route.destination);
@@ -116,10 +160,10 @@ export async function getDetails(icao24: string, log: Logger): Promise<AircraftD
       : null,
   ]);
 
-  if (!rawRoute) return { state, aircraft, route: null, progress: null };
-  const { progress, verified } = computeProgress(state, rawRoute, takeoffOf(await trackPromise));
-  // Con una ruta que no encaja, el progreso y el ETA serían inventados: mejor no darlos
-  return { state, aircraft, route: { ...rawRoute, verified }, progress: verified ? progress : null };
+  const takeoff = takeoffOf(await trackPromise);
+  const departure = takeoff ? nearestAirport(takeoff, allAirports()) : null;
+  if (!rawRoute) return { state, aircraft, route: null, progress: null, departure };
+  return { state, aircraft, departure, ...resolveRoute(state, rawRoute, takeoff, departure) };
 }
 
 async function getAirport(icao: string, log: Logger): Promise<Airport | null> {
@@ -158,6 +202,7 @@ export async function getSchedule(icao24: string, log: Logger): Promise<FlightSc
       ...raw,
       airline: flight.airline ? { name: flight.airline, icao: callsign.slice(0, 3), iata: null } : null,
       verified: computed.verified,
+      estimated: false,
     };
     progress = computed.verified ? computed.progress : null;
   }
