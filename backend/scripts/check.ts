@@ -6,7 +6,7 @@ import { TtlCache } from '../utils/ttlCache.ts';
 import { toTrack } from '../providers/openSky.provider.ts';
 import { takeoffOf } from '../services/aircraft.service.ts';
 import { parseAirports, splitCsvLine } from '../providers/airportDb.provider.ts';
-import { bearingDeg, computeProgress, distanceKm, nearestAirport, resolveRoute } from '../services/flightDetails.service.ts';
+import { bearingDeg, computeProgress, distanceKm, nearestAirport } from '../services/flightDetails.service.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 
 // Prueba rápida del panel (geometría y elección del vuelo de Aviationstack): npm run check
@@ -128,31 +128,15 @@ const airportList = parseAirports(
   ].join('\n'),
 );
 assert.deepEqual(airportList.map((a) => a.iata), ['LAX', 'DFW']);
-const [lax, dfw] = airportList as [(typeof airportList)[number], (typeof airportList)[number]];
+const lax = airportList[0]!;
 // Primer punto real del recorrido de DAL803, junto a DFW; lejos de todo, ninguno
 assert.equal(nearestAirport({ lat: 32.9099, lng: -97.0547 }, airportList)?.iata, 'DFW');
 assert.equal(nearestAirport({ lat: 36, lng: -100 }, airportList), null);
 
-// DAL803 real: adsbdb dice LAX→SEA, despegó de DFW y vuela en Washington hacia Seattle -> DFW→SEA estimada
+// DAL803 real: adsbdb dice LAX→SEA pero despegó de DFW -> no se confirma, aunque el avión vaya hacia Seattle
 const sea = { icao: 'KSEA', iata: 'SEA', name: 'Seattle-Tacoma', city: 'Seattle', lat: 47.449, lng: -122.309 };
 const dal803 = { callsign: 'DAL803', flightNumber: 'DL803', airline: null, origin: lax, destination: sea };
 const overWashington = { ...plane(46.3744, -120.0991), callsign: 'DAL803', hdg: 300 };
-const resolved = resolveRoute(overWashington, dal803, { lat: 32.9099, lng: -97.0547 }, dfw);
-assert.equal(resolved.route.estimated, true);
-assert.equal(resolved.route.origin.iata, 'DFW');
-assert.ok(resolved.progress !== null && resolved.progress.percent > 85);
-// DAL776 real: adsbdb dice BOS→DEN, despegó de Miami y va al norte frente a Carolina del Norte -> MIA→DEN tiene
-// un desvío de 1,23: ni confirmada ni estimada
-const mia = { icao: 'KMIA', iata: 'MIA', name: 'Miami', city: 'Miami', lat: 25.7932, lng: -80.2906 };
-const den = { icao: 'KDEN', iata: 'DEN', name: 'Denver', city: 'Denver', lat: 39.8617, lng: -104.6731 };
-const dal776 = resolveRoute(
-  { ...plane(33.2506, -77.5606), hdg: 28 },
-  { callsign: 'DAL776', flightNumber: 'DL776', airline: null, origin: route.destination, destination: den },
-  { lat: 25.8021, lng: -80.2623 },
-  mia,
-);
-assert.equal(dal776.route.verified, false);
-assert.equal(dal776.route.estimated, false);
-assert.equal(dal776.progress, null);
+assert.equal(computeProgress(overWashington, dal803, { lat: 32.9099, lng: -97.0547 }).verified, false);
 
 console.log('check OK');

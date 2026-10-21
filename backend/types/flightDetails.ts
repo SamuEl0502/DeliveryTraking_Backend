@@ -33,12 +33,10 @@ export interface FlightRoute {
   destination: Airport;
   /** false si la posición del avión no encaja con esta ruta (ruta posiblemente equivocada) */
   verified: boolean;
-  /** true: el origen es el despegue real (OpenSky) y el destino el de adsbdb, que encaja con el rumbo pero no está confirmado */
-  estimated: boolean;
 }
 
 /** Ruta tal como llega de la fuente, antes de compararla con la posición del avión */
-export type RawRoute = Omit<FlightRoute, 'verified' | 'estimated'>;
+export type RawRoute = Omit<FlightRoute, 'verified'>;
 
 /** Progreso calculado en el backend con las coordenadas (sin llamadas externas) */
 export interface FlightProgress {

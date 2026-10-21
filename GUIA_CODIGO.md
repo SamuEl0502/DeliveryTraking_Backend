@@ -341,12 +341,11 @@ Para actualizar la base basta con borrar `backend/data/aircraft.csv.gz` y reinic
 | `parseAirports(csv)` | `Airport[]` | Lee las columnas por nombre y se queda con `large_airport` y `medium_airport` con `scheduled_service = yes`. |
 | `allAirports()` | `readonly Airport[]` | La lista cargada (vacía hasta que termina de cargar). |
 
-En `flightDetails.service.ts` la usan dos funciones:
+En `flightDetails.service.ts` la usa `getDetails` para llenar `departure`:
 
 | Función | Qué hace |
 |---|---|
 | `nearestAirport(point, airports, maxKm = 15)` | Aeropuerto más cercano al punto, si está a menos de 15 km; si no, `null`. |
-| `resolveRoute(state, raw, takeoff, departure)` | Elige la ruta del panel: (1) la de adsbdb si encaja (`verified: true, estimated: false`); (2) si no, y el despegue fue en otro aeropuerto, prueba despegue → destino de adsbdb con la verificación por geometría y, si encaja, la devuelve con `estimated: true`; (3) si nada encaja, la de adsbdb con `verified: false` y sin progreso. |
 
 Para actualizar la lista basta con borrar `backend/data/airports.csv` y reiniciar.
 

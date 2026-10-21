@@ -90,26 +90,6 @@ export function nearestAirport(
   return best;
 }
 
-/** Elige la ruta del panel: la de adsbdb si encaja; si no, el despegue real con el destino de adsbdb si ese tramo encaja */
-export function resolveRoute(
-  state: AircraftState,
-  raw: RawRoute,
-  takeoff: { lat: number; lng: number } | null,
-  departure: Airport | null,
-): { route: FlightRoute; progress: FlightProgress | null } {
-  const direct = computeProgress(state, raw, takeoff);
-  if (direct.verified) return { route: { ...raw, verified: true, estimated: false }, progress: direct.progress };
-  // adsbdb trae otro tramo del mismo número de vuelo. Sin el despegue en el cálculo: así se exige que el
-  // tramo despegue→destino no tenga desvío, y un destino cualquiera que solo quede "por delante" no pasa
-  if (departure && departure.icao !== raw.origin.icao) {
-    const guess = { ...raw, origin: departure };
-    const g = computeProgress(state, guess);
-    if (g.verified) return { route: { ...guess, verified: true, estimated: true }, progress: g.progress };
-  }
-  // Con una ruta que no encaja, el progreso y el ETA serían inventados: mejor no darlos
-  return { route: { ...raw, verified: false, estimated: false }, progress: null };
-}
-
 export function computeProgress(
   state: AircraftState,
   route: RawRoute,
@@ -163,7 +143,9 @@ export async function getDetails(icao24: string, log: Logger): Promise<AircraftD
   const takeoff = takeoffOf(await trackPromise);
   const departure = takeoff ? nearestAirport(takeoff, allAirports()) : null;
   if (!rawRoute) return { state, aircraft, route: null, progress: null, departure };
-  return { state, aircraft, departure, ...resolveRoute(state, rawRoute, takeoff, departure) };
+  const { progress, verified } = computeProgress(state, rawRoute, takeoff);
+  // Con una ruta que no encaja, el progreso y el ETA serían inventados: mejor no darlos
+  return { state, aircraft, departure, route: { ...rawRoute, verified }, progress: verified ? progress : null };
 }
 
 async function getAirport(icao: string, log: Logger): Promise<Airport | null> {
@@ -202,7 +184,6 @@ export async function getSchedule(icao24: string, log: Logger): Promise<FlightSc
       ...raw,
       airline: flight.airline ? { name: flight.airline, icao: callsign.slice(0, 3), iata: null } : null,
       verified: computed.verified,
-      estimated: false,
     };
     progress = computed.verified ? computed.progress : null;
   }

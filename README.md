@@ -78,7 +78,7 @@ La ruta de adsbdb es la asignada al indicativo y en vivo acierta poco (7 de 25 v
 
 Si el recorrido de OpenSky empieza en tierra o a menos de 1.500 m, su primer punto es el despegue real. En ese caso la ruta de adsbdb solo se acepta si su origen está a menos de 30 km de ese punto y el avión apunta al destino. Un desvío por clima ya no la invalida, y un origen distinto sí. En una prueba con 20 vuelos se confirmaron 5: en los demás, adsbdb tenía otro tramo del mismo número de vuelo.
 
-Por eso el despegue también se convierte en aeropuerto: el aeropuerto de OurAirports más cercano, a menos de 15 km, es `departure`. Si la ruta de adsbdb no encaja pero el tramo despegue → destino de adsbdb sí, sin desvío y con el rumbo correcto, se devuelve esa ruta con `estimated: true`. Así, DAL803 (LAX→SEA en adsbdb, despegó de Dallas) sale como DFW→SEA estimada. En otra prueba con 20 vuelos se supo el aeropuerto de despegue de los 20, y 6 quedaron con ruta estimada; para los demás el panel puede mostrar "Despegó de …".
+Por eso el despegue también se convierte en aeropuerto: el aeropuerto de OurAirports más cercano, a menos de 15 km, es `departure`. Si la ruta de adsbdb no encaja, el panel muestra "Despegó de …" y el destino como desconocido: no se inventa un destino. Por ejemplo, DAL803 figuraba LAX→SEA en adsbdb, pero despegó de Dallas, así que sale "Despegó de DFW". En una prueba con 20 vuelos se supo el aeropuerto de despegue de los 20. En otra con 40 vuelos de aerolínea, 7 tenían la ruta confirmada; el destino real de los demás se consulta con "Ver horarios".
 
 La base de aeronaves de Mictronics se publica, según tar1090-db y proyectos que la usan, con licencia ODC-By 1.0, que exige citar la fuente (pendiente de confirmar en la web de Mictronics, que no respondió).
 
@@ -91,7 +91,7 @@ Todas las respuestas son JSON y llevan el header `x-correlation-id`. Las rutas b
 | `GET /health` | `{ status: "ok", uptime, timestamp }` |
 | `GET /api/aircraft` | `{ time, count, aircraft: AircraftState[] }` con los aviones sobre EE. UU. continental |
 | `GET /api/aircraft/:icao24` | Un `AircraftState`. `icao24` son 6 caracteres hexadecimales (se aceptan mayúsculas). |
-| `GET /api/aircraft/:icao24/details` | `{ state, aircraft, route, progress, departure }` para el panel del avión. `departure` es el aeropuerto del que despegó según OpenSky, o `null`; `route.estimated` indica que el origen salió de ese despegue. No gasta Aviationstack. |
+| `GET /api/aircraft/:icao24/details` | `{ state, aircraft, route, progress, departure }` para el panel del avión. `departure` es el aeropuerto del que despegó según OpenSky, o `null`. No gasta Aviationstack. |
 | `GET /api/aircraft/:icao24/track` | `{ icao24, callsign, path: TrackPoint[] }`: recorrido del vuelo actual desde el despegue, con altitud en cada punto, para la estela por colores. 4 créditos de OpenSky de su propia cuenta y caché de 1 min. 404 `TRACK_NOT_FOUND` si OpenSky no lo tiene. |
 | `GET /api/aircraft/:icao24/schedule` | `{ flightNumber, airline, status, departure, arrival, route, progress, source }`. Única ruta que gasta Aviationstack. |
 
