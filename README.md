@@ -65,15 +65,17 @@ Cada dato sale de la fuente más barata. Las APIs externas solo se llaman desde 
 | Fuente | Qué da | Cuándo se llama | Costo |
 |---|---|---|---|
 | [OpenSky](https://openskynetwork.github.io/opensky-api/rest.html) | Posición, altitud, velocidad, rumbo, en tierra | Lista de EE. UU. con caché de `OPENSKY_CACHE_TTL_MS` | 4 créditos por consulta |
-| [Base de aeronaves de Mictronics](https://www.mictronics.de/aircraft-database/) (vía [tar1090-db](https://github.com/wiedehopf/tar1090-db)) | Tipo ICAO de cada avión (`B738`, `C172`...) para el icono del mapa | Se descarga sola al arrancar en `backend/data/` (8 MB, no va al repo) y vive en memoria | Gratis, sin llave |
 | [adsbdb](https://github.com/mrjackwills/adsbdb) | Modelo, matrícula, foto, aerolínea, origen y destino | Al seleccionar un avión (caché de 6 h) | Gratis, sin llave |
 | Cálculo propio | Progreso, km recorridos y restantes, ETA | Al seleccionar un avión | 0 |
 | [Aviationstack](https://aviationstack.com/pricing) | Ruta real del tramo activo, horarios programados/estimados/reales, retraso, terminal, puerta, estado | Solo con `/schedule` (caché de 30 min) | 1 petición (plan gratis: 100 al mes) |
 | [hexdb](https://hexdb.io) | Coordenadas de los aeropuertos de Aviationstack | Con `/schedule` (caché de 30 días) | Gratis, sin llave |
+| [Base de aeronaves de Mictronics](https://www.mictronics.de/aircraft-database/) (vía [tar1090-db](https://github.com/wiedehopf/tar1090-db)) | Tipo ICAO de cada avión (`B738`, `C172`...) para el icono del mapa | Se descarga sola al arrancar en `backend/data/` (8 MB, no va al repo) y vive en memoria | Gratis, sin llave |
 
-Restricciones: los datos de rutas de adsbdb no se pueden copiar a otra base de datos (solo caché en memoria). El plan gratis de Aviationstack no permite uso comercial. La base de Mictronics se publica, según tar1090-db y proyectos que la usan, con licencia ODC-By 1.0, que exige citar la fuente (pendiente de confirmar en la web de Mictronics, que no respondió).
+Restricciones: los datos de rutas de adsbdb no se pueden copiar a otra base de datos (solo caché en memoria). El plan gratis de Aviationstack no permite uso comercial.
 
 La ruta de adsbdb es la asignada al indicativo y en vivo acierta poco (7 de 25 vuelos en una prueba), porque las aerolíneas reutilizan números de vuelo. La de Aviationstack es la del tramo que el avión vuela ahora, así que `/schedule` la devuelve para reemplazar a la de `/details`.
+
+La base de aeronaves de Mictronics se publica, según tar1090-db y proyectos que la usan, con licencia ODC-By 1.0, que exige citar la fuente (pendiente de confirmar en la web de Mictronics, que no respondió).
 
 ## API
 
