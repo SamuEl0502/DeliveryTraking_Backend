@@ -316,6 +316,17 @@ Al cargar el archivo se escribe el log `"OpenSky provider mode"` con el modo: `f
 | `getDetails(icao24, log)` | código del avión y logger | `Promise<AircraftDetails>` | Toma el avión de OpenSky (de la caché), pide a adsbdb el avión (con la foto de Planespotters encima, si hay) y la ruta en paralelo, y calcula el progreso. Si adsbdb falla, devuelve `null` en esas partes sin cortar la respuesta. | `getAircraftDetails` |
 | `getSchedule(icao24, log)` | código del avión y logger | `Promise<FlightSchedule>` | Con el indicativo pide a Aviationstack el tramo activo, completa las coordenadas de los aeropuertos con hexdb y calcula la ruta real y el progreso con la posición actual. Sin indicativo o sin vuelo activo, lanza 404 `SCHEDULE_NOT_FOUND`. | `getAircraftSchedule` |
 
+### `backend/providers/aircraftDb.provider.ts`
+**Para qué existe:** dice el tipo de cada avión de la lista (`B738`, `C172`...) sin llamar a ninguna API, para que el mapa elija el icono por tamaño. Usa la base de Mictronics publicada por tar1090-db (unos 620.000 aviones).
+
+| Función | Devuelve | Qué hace |
+|---|---|---|
+| `loadAircraftDb()` | `Promise<void>` | La llama `server.ts` al arrancar, sin esperar. Si falta `data/aircraft.csv.gz`, lo descarga (8 MB); después lo descomprime y llena el mapa en memoria. Si falla, solo avisa en el log y los aviones salen con `type: null`. |
+| `parseAircraftDb(csv)` | `Map<string, string>` | Convierte filas `A0F1BB;N160AN;A321;...` en `a0f1bb -> A321`. Ignora las filas sin tipo. Lo prueba `npm run check`. |
+| `typeOf(icao24)` | `string \| null` | Tipo del avión; lo usa `toAircraftState`. |
+
+Para actualizar la base basta con borrar `backend/data/aircraft.csv.gz` y reiniciar.
+
 ### `backend/providers/adsbdb.provider.ts`
 **Para qué existe:** habla con adsbdb (`api.adsbdb.com/v0`), gratis y sin llave. Timeout de 5 s.
 
@@ -356,7 +367,7 @@ Condiciones de Planespotters: el User-Agent lleva la URL del repositorio como co
 
 | Tipo | Campos |
 |---|---|
-| `AircraftState` | `icao24` (código del avión), `callsign` (indicativo del vuelo o `null`), `lat`, `lng`, `hdg` (rumbo en grados desde el norte), `spd` (velocidad en m/s), `alt` (altitud en metros), `onGround` (si está en tierra), `ts` (hora de la posición, Unix en segundos). |
+| `AircraftState` | `icao24` (código del avión), `callsign` (indicativo del vuelo o `null`), `lat`, `lng`, `hdg` (rumbo en grados desde el norte), `spd` (velocidad en m/s), `alt` (altitud en metros), `onGround` (si está en tierra), `type` (tipo ICAO del avión o `null`), `ts` (hora de la posición, Unix en segundos). |
 | `AircraftSnapshot` | `time` (hora del lote según OpenSky) y `aircraft` (lista de `AircraftState`). |
 
 ### `backend/types/express.d.ts`

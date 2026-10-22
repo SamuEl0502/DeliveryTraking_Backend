@@ -83,10 +83,13 @@ Cada dato sale de la fuente más barata. Las APIs externas solo se llaman desde 
 | Cálculo propio | Progreso, km recorridos y restantes, ETA | Al seleccionar un avión | 0 |
 | [Aviationstack](https://aviationstack.com/pricing) | Ruta real del tramo activo, horarios programados/estimados/reales, retraso, terminal, puerta, estado | Solo con `/schedule` (caché de 30 min) | 1 petición (plan gratis: 100 al mes) |
 | [hexdb](https://hexdb.io) | Coordenadas de los aeropuertos de Aviationstack | Con `/schedule` (caché de 30 días) | Gratis, sin llave |
+| [Base de aeronaves de Mictronics](https://www.mictronics.de/aircraft-database/) (vía [tar1090-db](https://github.com/wiedehopf/tar1090-db)) | Tipo ICAO de cada avión (`B738`, `C172`...) para el icono del mapa | Se descarga sola al arrancar en `backend/data/` (8 MB, no va al repo) y vive en memoria | Gratis, sin llave |
 
 Restricciones: los datos de rutas de adsbdb no se pueden copiar a otra base de datos (solo caché en memoria). El plan gratis de Aviationstack no permite uso comercial. Planespotters exige mostrar el fotógrafo con un enlace a la foto (`photographer`, `photoLink`) y no permite guardar la imagen.
 
 La ruta de adsbdb es la asignada al indicativo y en vivo acierta poco (7 de 25 vuelos en una prueba), porque las aerolíneas reutilizan números de vuelo. La de Aviationstack es la del tramo que el avión vuela ahora, así que `/schedule` la devuelve para reemplazar a la de `/details`.
+
+La base de aeronaves de Mictronics se publica, según tar1090-db y proyectos que la usan, con licencia ODC-By 1.0, que exige citar la fuente (pendiente de confirmar en la web de Mictronics, que no respondió).
 
 ## API
 
@@ -111,6 +114,7 @@ Todas las respuestas son JSON y llevan el header `x-correlation-id`. Las rutas b
 | `spd` | `number \| null` | m/s. |
 | `alt` | `number \| null` | Metros (barométrica; si falta, geométrica). |
 | `onGround` | `boolean` | En tierra o en el aire. |
+| `type` | `string \| null` | Tipo ICAO del avión (`B738`, `A321`, `C172`). `null` si no está en la base de aeronaves o si aún no terminó de cargar. |
 | `ts` | `number` | Unix en segundos (`time_position` o, si falta, `last_contact`). |
 
 `time` es el momento del lote según OpenSky, en Unix segundos.

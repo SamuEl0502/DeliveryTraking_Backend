@@ -5,6 +5,7 @@ import { env } from '../config/env.ts';
 import { logger } from '../config/logger.ts';
 import { AppError } from '../utils/AppError.ts';
 import type { AircraftSnapshot, AircraftState } from '../types/aircraft.ts';
+import { typeOf } from './aircraftDb.provider.ts';
 
 // Fuente: https://openskynetwork.github.io/opensky-api/rest.html
 const API_URL = 'https://opensky-network.org/api';
@@ -154,6 +155,7 @@ function toAircraftState(row: unknown[]): AircraftState | null {
     spd: num(row[F.velocity]),
     alt: num(row[F.baroAltitude]) ?? num(row[F.geoAltitude]),
     onGround: row[F.onGround] === true,
+    type: typeOf(icao24),
     ts: num(row[F.timePosition]) ?? num(row[F.lastContact]) ?? 0,
   };
 }
