@@ -11,7 +11,7 @@ export interface Airport {
   lng: number;
 }
 
-/** Datos fijos del avión (adsbdb) */
+/** Datos fijos del avión (adsbdb; la foto, de Planespotters si tiene) */
 export interface AircraftInfo {
   registration: string | null;
   /** Modelo, por ejemplo "Boeing 757 224/W" */
@@ -21,6 +21,9 @@ export interface AircraftInfo {
   owner: string | null;
   photoUrl: string | null;
   photoThumbnailUrl: string | null;
+  /** Página de la foto en Planespotters; el frontend debe enlazarla junto al fotógrafo */
+  photoLink: string | null;
+  photographer: string | null;
 }
 
 /** Ruta asignada al indicativo (adsbdb) */

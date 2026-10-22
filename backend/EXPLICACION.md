@@ -36,7 +36,8 @@ Guía para entender y explicar el código. El backend es un servidor Express con
 | `services/aircraft.service.ts` | Service | Lógica: define la caja de EE. UU., usa la caché y lanza 404 si no hay avión. |
 | `providers/openSky.provider.ts` | Provider | Único que habla con OpenSky: token OAuth2, consulta, conversión a `AircraftState` y errores. |
 | `services/flightDetails.service.ts` | Service | Panel del avión seleccionado: decide qué API responde cada dato, calcula progreso y ETA y verifica la ruta. |
-| `providers/adsbdb.provider.ts` | Provider | Habla con adsbdb (gratis): modelo, matrícula y foto por `icao24`, y ruta por indicativo. |
+| `providers/adsbdb.provider.ts` | Provider | Habla con adsbdb (gratis): modelo, matrícula y foto de respaldo por `icao24`, y ruta por indicativo. |
+| `providers/planespotters.provider.ts` | Provider | Foto del avión revisada por moderadores, con fotógrafo y enlace (gratis). |
 | `providers/aviationStack.provider.ts` | Provider | Habla con Aviationstack: tramo activo del vuelo (ruta real, horarios, retraso, terminal, puerta). Cada llamada gasta 1 de 100 peticiones al mes. |
 | `providers/hexdb.provider.ts` | Provider | Habla con hexdb (gratis): coordenadas de los aeropuertos que da Aviationstack. |
 

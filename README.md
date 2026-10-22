@@ -78,12 +78,13 @@ Cada dato sale de la fuente más barata. Las APIs externas solo se llaman desde 
 | Fuente | Qué da | Cuándo se llama | Costo |
 |---|---|---|---|
 | [OpenSky](https://openskynetwork.github.io/opensky-api/rest.html) | Posición, altitud, velocidad, rumbo, en tierra | Lista de EE. UU. con caché de `OPENSKY_CACHE_TTL_MS` | 4 créditos por consulta |
-| [adsbdb](https://github.com/mrjackwills/adsbdb) | Modelo, matrícula, foto, aerolínea, origen y destino | Al seleccionar un avión (caché de 6 h) | Gratis, sin llave |
+| [adsbdb](https://github.com/mrjackwills/adsbdb) | Modelo, matrícula, foto de respaldo, aerolínea, origen y destino | Al seleccionar un avión (caché de 6 h) | Gratis, sin llave |
+| [Planespotters](https://www.planespotters.net/photo/api) | Foto del avión revisada por moderadores, fotógrafo y enlace | Al seleccionar un avión (misma caché de 6 h) | Gratis, sin llave |
 | Cálculo propio | Progreso, km recorridos y restantes, ETA | Al seleccionar un avión | 0 |
 | [Aviationstack](https://aviationstack.com/pricing) | Ruta real del tramo activo, horarios programados/estimados/reales, retraso, terminal, puerta, estado | Solo con `/schedule` (caché de 30 min) | 1 petición (plan gratis: 100 al mes) |
 | [hexdb](https://hexdb.io) | Coordenadas de los aeropuertos de Aviationstack | Con `/schedule` (caché de 30 días) | Gratis, sin llave |
 
-Restricciones: los datos de rutas de adsbdb no se pueden copiar a otra base de datos (solo caché en memoria). El plan gratis de Aviationstack no permite uso comercial.
+Restricciones: los datos de rutas de adsbdb no se pueden copiar a otra base de datos (solo caché en memoria). El plan gratis de Aviationstack no permite uso comercial. Planespotters exige mostrar el fotógrafo con un enlace a la foto (`photographer`, `photoLink`) y no permite guardar la imagen.
 
 La ruta de adsbdb es la asignada al indicativo y en vivo acierta poco (7 de 25 vuelos en una prueba), porque las aerolíneas reutilizan números de vuelo. La de Aviationstack es la del tramo que el avión vuela ahora, así que `/schedule` la devuelve para reemplazar a la de `/details`.
 
@@ -198,7 +199,7 @@ Actualizado el 2026-10-19. Backend y frontend sincronizados en `main` (backend P
 - `GET /health`, con el header `x-correlation-id` y logs estructurados.
 - `GET /api/aircraft`: aviones reales sobre EE. UU. desde OpenSky (OAuth2 o anónimo, según el `.env`), con caché en memoria. Si OpenSky va lento, se responde al instante con el último dato y se refresca en segundo plano (tope de 45 s por descarga).
 - `GET /api/aircraft/:icao24`: un avión concreto, con validación Zod. Se busca primero en la lista ya en caché, así que no gasta créditos de OpenSky.
-- `GET /api/aircraft/:icao24/details`: avión, ruta, progreso y ETA para el panel (adsbdb + cálculo propio).
+- `GET /api/aircraft/:icao24/details`: avión, ruta, progreso y ETA para el panel (adsbdb + cálculo propio). La foto viene de Planespotters, con el fotógrafo y el enlace para los créditos.
 - `GET /api/aircraft/:icao24/schedule`: ruta real, horarios, retraso, terminal y puerta bajo demanda (Aviationstack + hexdb).
 - Manejo global de errores con formato JSON único, `helmet`, CORS y rate limiting.
 - Plan B de demo con datos grabados (`USE_FIXTURE=true`).
