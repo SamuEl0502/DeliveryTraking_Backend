@@ -120,7 +120,7 @@ Cada una da algo que las otras no dan, y se usa la más barata para cada dato. O
 Aviationstack manda la hora local del aeropuerto, pero marcada como UTC (`+00:00`). Con AAL3304 se notó: la salida "17:40 UTC" implicaba 5 h de vuelo en un trayecto de 3 h. El provider toma la hora de reloj y la convierte con la zona horaria del aeropuerto (`America/New_York`), que viene en la misma respuesta.
 
 **10. ¿Cómo saben si la ruta es correcta?**
-adsbdb devuelve la ruta asignada al indicativo, que a veces está desactualizada. El service suma la distancia del origen al avión y del avión al destino; si es más de un 20 % mayor que la distancia directa, o si el rumbo del avión se aleja más de 90° de la dirección al destino, el avión no está en esa ruta y se marca `verified: false`. Por ejemplo, UAL19 decía JFK→SFO pero volaba hacia el noreste sobre el Atlántico.
+adsbdb devuelve la ruta asignada al indicativo, que a veces está desactualizada. El service suma la distancia del origen al avión y del avión al destino; si es más de un 20 % mayor que la distancia directa, o si el rumbo del avión se aleja más de 90° de la dirección al destino, el avión no está en esa ruta y se marca `verified: false`. Por ejemplo, UAL19 decía JFK→SFO pero volaba hacia el noreste sobre el Atlántico. Si además el recorrido de OpenSky muestra el despegue, manda el origen: DAL803 figuraba LAX→SEA en adsbdb, pero despegó de Dallas, así que no se confirma.
 
 ## 4. Dato importante sobre la cuota de OpenSky
 

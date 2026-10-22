@@ -38,6 +38,9 @@ export interface FlightRoute {
   verified: boolean;
 }
 
+/** Ruta tal como llega de la fuente, antes de compararla con la posición del avión */
+export type RawRoute = Omit<FlightRoute, 'verified'>;
+
 /** Progreso calculado en el backend con las coordenadas (sin llamadas externas) */
 export interface FlightProgress {
   totalKm: number;
@@ -55,6 +58,8 @@ export interface AircraftDetails {
   aircraft: AircraftInfo | null;
   route: FlightRoute | null;
   progress: FlightProgress | null;
+  /** Aeropuerto del que despegó según el recorrido de OpenSky; null si OpenSky no vio el despegue */
+  departure: Airport | null;
 }
 
 /** Salida o llegada; fechas en ISO 8601 UTC */

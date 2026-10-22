@@ -255,6 +255,8 @@ No tienen `try/catch`: Express 5 envía al `errorHandler` cualquier error de una
 | `boxCache` | — | `TtlCache<AircraftSnapshot>` | Caché de la lista completa, con TTL `OPENSKY_CACHE_TTL_MS`. | `getUsAircraft` |
 | `singleCache` | — | `TtlCache<AircraftState \| null>` | Caché de aviones individuales, uno por `icao24`. | `getAircraftByIcao24` |
 | `getUsAircraft(log)` | logger de la petición | `Promise<AircraftSnapshot>` | Busca en la caché con la clave `"us"`; si no hay dato fresco, llama a `openSky.fetchByBox(US_BOX)`. | `listAircraft` |
+| `findTrack(icao24, log)` / `getTrack(icao24, log)` | código del avión y logger | `FlightTrack \| null` / `FlightTrack` | Recorrido con caché de 1 min (`trackCache`), compartida entre `/details` y `/track`. `findTrack` nunca lanza; `getTrack` lanza 404 `TRACK_NOT_FOUND`. | `getDetails`, `getAircraftTrack` |
+| `takeoffOf(track)` | recorrido o `null` | punto o `null` | Primer punto del recorrido si está en tierra o a menos de 1.500 m: el despegue. `getDetails` se lo pasa a `computeProgress` como tercer argumento; entonces `verified` exige que el origen de adsbdb esté a menos de 30 km del despegue y que el rumbo apunte al destino, sin mirar el desvío. Si OpenSky empezó a ver el avión ya en vuelo, `null`, y se usa la verificación por geometría. | `getDetails`, `check.ts` |
 | `getAircraftByIcao24(icao24, log)` | código del avión y logger | `Promise<AircraftState>` | Busca en la caché con la clave `icao24`; si no hay dato, llama a `openSky.fetchByIcao24`. Si el resultado es `null`, lanza `AppError(404, 'AIRCRAFT_NOT_FOUND')`. | `getAircraft` |
 
 Nota: un "no encontrado" (`null`) también se guarda en la caché durante el TTL. Mientras dure, preguntar otra vez por ese avión responde 404 sin llamar a OpenSky.
@@ -297,6 +299,8 @@ Al cargar el archivo se escribe el log `"OpenSky provider mode"` con el modo: `f
 | `readFixture()` | nada | `Promise<unknown>` | Lee y parsea `fixtures/opensky-sample.json`. Si no puede, lanza 500 `FIXTURE_MISSING`. | `fetchByBox`, `fetchByIcao24` (solo con `USE_FIXTURE=true`) |
 | `fetchRawByBox(box)` | caja geográfica | `Promise<unknown>` | Pide los estados de esa caja, sin convertirlos. | `fetchByBox`, `scripts/saveFixture.ts` |
 | `fetchByBox(box)` | caja geográfica | `Promise<AircraftSnapshot>` | Con `USE_FIXTURE` lee el archivo; si no, llama a OpenSky. En ambos casos convierte con `toSnapshot`. | `getUsAircraft` (service) |
+| `fetchTrack(icao24)` | código del avión | `Promise<FlightTrack \| null>` | `GET /tracks/all?time=0`: recorrido del vuelo en curso. OpenSky lo marca como experimental. 404 = `null`; con `USE_FIXTURE`, siempre `null`. | `findTrack` (service) |
+| `toTrack(raw)` | respuesta de `/tracks` | `FlightTrack` | Valida con Zod y convierte cada punto `[time, lat, lon, alt, track, on_ground]` en `TrackPoint`; descarta los que no tienen posición. | `fetchTrack`, `check.ts` |
 | `fetchByIcao24(icao24)` | código del avión | `Promise<AircraftState \| null>` | Con `USE_FIXTURE` busca el avión en el archivo; si no, consulta a OpenSky con `?icao24=`. Devuelve el avión o `null`. | `getAircraftByIcao24` (service) |
 
 ---
@@ -326,6 +330,24 @@ Al cargar el archivo se escribe el log `"OpenSky provider mode"` con el modo: `f
 | `typeOf(icao24)` | `string \| null` | Tipo del avión; lo usa `toAircraftState`. |
 
 Para actualizar la base basta con borrar `backend/data/aircraft.csv.gz` y reiniciar.
+
+### `backend/providers/airportDb.provider.ts`
+**Para qué existe:** convierte el punto de despegue del recorrido en un aeropuerto. Usa la lista de OurAirports (dominio público), filtrada a los aeropuertos grandes y medianos con vuelos regulares (unos 3.300).
+
+| Función | Devuelve | Qué hace |
+|---|---|---|
+| `loadAirportDb()` | `Promise<void>` | La llama `server.ts` al arrancar, sin esperar. Si falta `data/airports.csv`, lo descarga (12 MB). Si falla, solo avisa en el log y `departure` sale `null`. |
+| `splitCsvLine(line)` | `string[]` | Separa una línea CSV respetando las comas y las comillas dentro de un campo. |
+| `parseAirports(csv)` | `Airport[]` | Lee las columnas por nombre y se queda con `large_airport` y `medium_airport` con `scheduled_service = yes`. |
+| `allAirports()` | `readonly Airport[]` | La lista cargada (vacía hasta que termina de cargar). |
+
+En `flightDetails.service.ts` la usa `getDetails` para llenar `departure`:
+
+| Función | Qué hace |
+|---|---|
+| `nearestAirport(point, airports, maxKm = 15)` | Aeropuerto más cercano al punto, si está a menos de 15 km; si no, `null`. |
+
+Para actualizar la lista basta con borrar `backend/data/airports.csv` y reiniciar.
 
 ### `backend/providers/adsbdb.provider.ts`
 **Para qué existe:** habla con adsbdb (`api.adsbdb.com/v0`), gratis y sin llave. Timeout de 5 s.

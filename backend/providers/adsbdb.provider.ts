@@ -2,7 +2,7 @@ import axios from 'axios';
 import { z } from 'zod';
 import { logger } from '../config/logger.ts';
 import { AppError } from '../utils/AppError.ts';
-import type { AircraftInfo, Airport, FlightRoute } from '../types/flightDetails.ts';
+import type { AircraftInfo, Airport, RawRoute } from '../types/flightDetails.ts';
 
 // Fuente: https://github.com/mrjackwills/adsbdb (gratis, sin llave)
 // Licencia: los datos de rutas no se pueden copiar a otra base de datos; solo caché en memoria
@@ -92,7 +92,7 @@ export async function fetchAircraftInfo(icao24: string): Promise<AircraftInfo | 
 }
 
 /** Ruta sin verificar (verified la decide el service con la posición del avión) */
-export async function fetchRoute(callsign: string): Promise<Omit<FlightRoute, 'verified'> | null> {
+export async function fetchRoute(callsign: string): Promise<RawRoute | null> {
   const data = await get(`/callsign/${encodeURIComponent(callsign)}`, routeSchema);
   if (!data) return null;
   const r = data.response.flightroute;

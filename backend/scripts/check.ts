@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs';
 import { localToIso, toActiveFlight } from '../providers/aviationStack.provider.ts';
 import { parseAircraftDb } from '../providers/aircraftDb.provider.ts';
 import { TtlCache } from '../utils/ttlCache.ts';
-import { bearingDeg, computeProgress, distanceKm } from '../services/flightDetails.service.ts';
+import { toTrack } from '../providers/openSky.provider.ts';
+import { takeoffOf } from '../services/aircraft.service.ts';
+import { parseAirports, splitCsvLine } from '../providers/airportDb.provider.ts';
+import { bearingDeg, computeProgress, distanceKm, nearestAirport } from '../services/flightDetails.service.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 
 // Prueba rápida del panel (geometría y elección del vuelo de Aviationstack): npm run check
@@ -90,5 +93,50 @@ assert.equal(await cache.getOrLoad('k', async () => 3, silent), 2);
 const db = parseAircraftDb('A0F1BB;N160AN;A321;00;AIRBUS A-321;2016;AMERICAN AIRLINES INC;\n000001;;;10;;;Miscode - VARIOUS;\n');
 assert.equal(db.get('a0f1bb'), 'A321');
 assert.equal(db.size, 1);
+
+// Recorrido real de SWA2107 (despegue en Phoenix); el punto sin posición se descarta
+const track = toTrack({
+  icao24: 'ad694c',
+  callsign: 'SWA2107 ',
+  path: [
+    [1792539658, 33.4311, -112.0174, 304, 90, false],
+    [1792539699, null, null, 609, 89, false],
+    [1792539752, 33.4329, -111.9222, 1219, 88, false],
+  ],
+});
+assert.equal(track.callsign, 'SWA2107');
+assert.equal(track.path.length, 2);
+assert.deepEqual(takeoffOf(track), track.path[0]);
+// Si OpenSky empezó a verlo en crucero, no hay despegue
+assert.equal(takeoffOf({ ...track, path: [{ ...track.path[0]!, alt: 11000 }] }), null);
+
+// Desvío fuerte (sobre Kentucky, ORD-BOS): sin despegue no encaja; despegando de ORD sí
+const detour = plane(37.8, -84.3);
+assert.equal(computeProgress(detour, route).verified, false);
+assert.equal(computeProgress(detour, route, { lat: 41.97, lng: -87.9 }).verified, true);
+// Despegó de otro aeropuerto (Denver): la ruta de adsbdb es de otro tramo aunque la geometría encaje
+assert.equal(computeProgress(plane(42.2, -79.5), route, { lat: 39.86, lng: -104.67 }).verified, false);
+
+// CSV de OurAirports: comas y comillas dentro de un campo; solo aeropuertos grandes y medianos con vuelos regulares
+assert.deepEqual(splitCsvLine('1,"a, b","x ""y"""'), ['1', 'a, b', 'x "y"']);
+const airportList = parseAirports(
+  [
+    '"id","ident","type","name","latitude_deg","longitude_deg","elevation_ft","continent","iso_country","iso_region","municipality","scheduled_service","icao_code","iata_code"',
+    '3632,"KLAX","large_airport","Los Angeles International Airport",33.942501,-118.407997,125,"NA","US","US-CA","Los Angeles","yes","KLAX","LAX"',
+    '3384,"KDFW","large_airport","Dallas Fort Worth International Airport",32.896801,-97.038002,607,"NA","US","US-TX","Dallas-Fort Worth","yes","KDFW","DFW"',
+    '9,"KSMO","medium_airport","Santa Monica Municipal Airport",34.0158,-118.4513,177,"NA","US","US-CA","Santa Monica","no","KSMO","SMO"',
+  ].join('\n'),
+);
+assert.deepEqual(airportList.map((a) => a.iata), ['LAX', 'DFW']);
+const lax = airportList[0]!;
+// Primer punto real del recorrido de DAL803, junto a DFW; lejos de todo, ninguno
+assert.equal(nearestAirport({ lat: 32.9099, lng: -97.0547 }, airportList)?.iata, 'DFW');
+assert.equal(nearestAirport({ lat: 36, lng: -100 }, airportList), null);
+
+// DAL803 real: adsbdb dice LAX→SEA pero despegó de DFW -> no se confirma, aunque el avión vaya hacia Seattle
+const sea = { icao: 'KSEA', iata: 'SEA', name: 'Seattle-Tacoma', city: 'Seattle', lat: 47.449, lng: -122.309 };
+const dal803 = { callsign: 'DAL803', flightNumber: 'DL803', airline: null, origin: lax, destination: sea };
+const overWashington = { ...plane(46.3744, -120.0991), callsign: 'DAL803', hdg: 300 };
+assert.equal(computeProgress(overWashington, dal803, { lat: 32.9099, lng: -97.0547 }).verified, false);
 
 console.log('check OK');

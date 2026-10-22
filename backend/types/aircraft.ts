@@ -17,6 +17,25 @@ export interface AircraftState {
   ts: number;
 }
 
+/** Punto del recorrido de OpenSky: se guarda al despegar, al aterrizar, al girar más de 2,5° o al cambiar la altitud más de 100 m */
+export interface TrackPoint {
+  /** Unix en segundos */
+  ts: number;
+  lat: number;
+  lng: number;
+  /** Altitud barométrica en metros */
+  alt: number | null;
+  hdg: number | null;
+  onGround: boolean;
+}
+
+/** Recorrido del vuelo actual desde que OpenSky lo vio por primera vez (normalmente el despegue) */
+export interface FlightTrack {
+  icao24: string;
+  callsign: string | null;
+  path: TrackPoint[];
+}
+
 export interface AircraftSnapshot {
   /** Momento del lote según OpenSky, Unix en segundos */
   time: number;
