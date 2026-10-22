@@ -1,2 +1,5 @@
 .env
 node_modules/
+# Configuración local de editores y herramientas
+.serena/
+.vscode/
