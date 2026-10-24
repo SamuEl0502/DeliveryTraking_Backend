@@ -10,7 +10,8 @@ Proyecto base: *Delivery Tracking con tracking geoespacial en vivo (WebSockets, 
 - Zod (validación de `.env` y de parámetros)
 - pino (logs JSON con `x-correlation-id`)
 - Axios (para consumir OpenSky, adsbdb, Aviationstack y hexdb)
-- Próximamente: PostgreSQL + Prisma y WebSocket (`ws`)
+- PostgreSQL + Prisma 6 (modelo de datos, migraciones y seed)
+- Próximamente: WebSocket (`ws`)
 
 ## Requisitos
 
@@ -43,16 +44,62 @@ Invoke-RestMethod http://localhost:3000/api/aircraft | Select-Object count
 
 ## Base de datos (PostgreSQL)
 
-El backend usa PostgreSQL 17 con Prisma. Requiere Docker Desktop en marcha.
+El backend usa PostgreSQL con Prisma 6. El esquema está en `models/schema.prisma`, las migraciones en `migrations/` y el seed en `scripts/seed.ts` (esas rutas se definen en `prisma.config.ts`). Sirve un PostgreSQL instalado en el equipo (opción A) o uno en Docker (opción B). **Docker es opcional.**
+
+Antes de cualquier comando de base de datos hay que correr `npm install` dentro de `backend/`. Usa los scripts de npm y no `npx prisma` sin instalar: `npx` descargaría otra versión de Prisma.
+
+### Opción A: PostgreSQL instalado en local (Windows)
+
+1. Instalar PostgreSQL 17 o 18. El instalador crea el usuario `postgres` y pide su clave. El servicio (`postgresql-x64-18`) queda escuchando en `localhost:5432`.
+2. Crear la base de datos `delivery_tracking`:
+   - En DBeaver: nueva conexión PostgreSQL (host `localhost`, puerto `5432`, base `postgres`, usuario `postgres` y su clave), luego clic derecho en **Databases** → **Create New Database** → nombre `delivery_tracking`.
+   - O con SQL: `CREATE DATABASE delivery_tracking;`
+3. En `backend/.env`, con tu clave en lugar del relleno:
+   ```
+   DATABASE_URL=postgresql://postgres:TU_CLAVE@localhost:5432/delivery_tracking
+   ```
+4. Crear las tablas y cargar los datos de prueba:
+   ```powershell
+   cd backend
+   npm run db:deploy    # aplica las migraciones de migrations/
+   npm run db:seed      # aeropuertos, usuarios, vuelos y envíos de prueba (puede repetirse sin duplicar)
+   ```
+5. Revisar en DBeaver: `delivery_tracking` → Schemas → `public` → Tables. Deben aparecer `Airport`, `Flight`, `Shipment`, `TrackingEvent`, `User` y `_prisma_migrations`. Si no se ven, clic derecho → Refresh.
+
+### Opción B: Docker (opcional)
+
+Requiere Docker Desktop en marcha y el puerto 5432 libre. Si ya tienes PostgreSQL instalado, detén su servicio o usa la opción A.
 
 ```powershell
 cd backend
-npm run db:up        # levanta PostgreSQL en 127.0.0.1:5432 (docker-compose.yml de la raíz)
-npm run db:deploy    # aplica las migraciones de migrations/
-npm run db:seed      # carga 5 aeropuertos (puede repetirse sin duplicar)
+npm run db:up        # levanta PostgreSQL 17 en 127.0.0.1:5432 (docker-compose.yml de la raíz)
+npm run db:deploy
+npm run db:seed
 ```
 
-Para cambiar el esquema en desarrollo: editar `models/schema.prisma` y ejecutar `npm run db:migrate`. La base de datos solo escucha en el propio equipo; no la expongas a la red.
+Con Docker, el `DATABASE_URL` es el que aparece comentado en `.env.example`.
+
+### Datos de prueba del seed
+
+| Usuario | Rol | Clave |
+|---|---|---|
+| `cliente@deliverytracking.test` | `CLIENT` | `Prueba123` |
+| `staff@deliverytracking.test` | `STAFF` (aeropuerto ATL) | `Prueba123` |
+
+Son solo para desarrollo: las claves se guardan con hash Argon2id. Además se cargan 8 aeropuertos (ATL, ORD, DFW, JFK, LAX, MEM, SDF y CVG), 3 vuelos, 3 envíos del cliente y sus eventos de rastreo.
+
+Para cambiar el esquema en desarrollo: editar `models/schema.prisma` y ejecutar `npm run db:migrate` (crea una migración nueva). La base de datos solo escucha en el propio equipo; no la expongas a la red.
+
+### Errores comunes en Windows
+
+| Error | Causa | Solución |
+|---|---|---|
+| `EPERM: operation not permitted, rename ... query_engine-windows.dll.node` | OneDrive o un `npm run dev` abierto bloquean el motor de Prisma mientras se regenera | Detén el servidor, pausa la sincronización de OneDrive y vuelve a correr `npm install` (o `npx prisma generate`) |
+| `P1000: Authentication failed` | Clave equivocada, o la clave tiene caracteres especiales sin codificar | Escribe los caracteres especiales con su código: `@` → `%40`, `#` → `%23`, `:` → `%3A`, `/` → `%2F`, `?` → `%3F`, `&` → `%26`, `%` → `%25`. Por ejemplo, `ab@1` queda `ab%401` |
+| `P1001: Can't reach database server at localhost:5432` | El servicio de PostgreSQL está detenido | `Get-Service postgresql*` y, si está detenido, iniciarlo desde `services.msc` |
+| `Bind for 127.0.0.1:5432 failed: port is already allocated` (Docker) | El PostgreSQL instalado ya usa el puerto 5432 | Usa solo uno de los dos: detén el servicio local o no levantes Docker. `Get-NetTCPConnection -LocalPort 5432` muestra quién lo ocupa |
+| `P1003: Database delivery_tracking does not exist` | Falta crear la base de datos | Paso 2 de la opción A |
+| `psql` no se reconoce como comando | La carpeta `bin` de PostgreSQL no está en el PATH | Usa DBeaver o la ruta completa: `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres` |
 
 ## Variables de entorno
 
@@ -63,7 +110,7 @@ Definidas en [`backend/.env.example`](backend/.env.example). El servidor las val
 | `PORT` | No | `3000` | Puerto del servidor. |
 | `NODE_ENV` | No | `development` | `development`, `test` o `production`. |
 | `CORS_ORIGIN` | **Sí** | — | Origen(es) del frontend permitidos, separados por coma. |
-| `DATABASE_URL` | No | — | Conexión a PostgreSQL (se usará con Prisma). |
+| `DATABASE_URL` | No | — | Conexión a PostgreSQL para Prisma (`postgresql://usuario:clave@host:puerto/base`). La necesitan los comandos `db:*`. Si se define, debe empezar por `postgresql://` o `postgres://`. |
 | `OPENSKY_CLIENT_ID` | No | — | Client id OAuth2 de OpenSky. Vacío = modo anónimo. |
 | `OPENSKY_CLIENT_SECRET` | No | — | Client secret OAuth2 de OpenSky. |
 | `OPENSKY_CACHE_TTL_MS` | No | `10000` | Vida de la caché de OpenSky en ms (mínimo `10000`; la plantilla trae `30000` para ahorrar cuota). |
@@ -137,7 +184,7 @@ Los tipos de `/details` y `/schedule` están en [`backend/types/flightDetails.ts
 | HTTP | `code` |
 |---|---|
 | 400 | `VALIDATION_ERROR`, `INVALID_JSON` |
-| 404 | `NOT_FOUND`, `AIRCRAFT_NOT_FOUND`, `SCHEDULE_NOT_FOUND` |
+| 404 | `NOT_FOUND`, `AIRCRAFT_NOT_FOUND`, `SCHEDULE_NOT_FOUND`, `TRACK_NOT_FOUND` |
 | 429 | `TOO_MANY_REQUESTS` |
 | 500 | `FIXTURE_MISSING`, `INTERNAL_ERROR` |
 | 502 | `OPENSKY_UNAVAILABLE`, `OPENSKY_AUTH_FAILED`, `OPENSKY_BAD_RESPONSE`, `AVIATIONSTACK_UNAVAILABLE`, `AVIATIONSTACK_AUTH_FAILED`, `AVIATIONSTACK_BAD_RESPONSE` |
@@ -238,3 +285,9 @@ Lo que cambió respecto al contrato inicial y por qué. Si el frontend usa algo 
 | 2026-10-19 | #2 | Horas de Aviationstack convertidas de hora local a UTC | Aviationstack marca como `+00:00` la hora local del aeropuerto |
 | 2026-10-19 | #2 | En códigos compartidos se usan el número y la aerolínea del operador | Se mostraba "EI7399 · Aer Lingus" en un vuelo de American |
 | 2026-10-19 | #2 | Nuevos errores `AVIATIONSTACK_*` y `SCHEDULE_NOT_FOUND` | Errores de la nueva fuente con el formato único |
+| 2026-10-20 | — | Si OpenSky va lento, `GET /api/aircraft` responde al instante con el dato anterior de la caché y lo refresca en segundo plano (tope de 45 s por descarga) | OpenSky mandaba la lista a goteo: tardaba ~58 s y el frontend se rendía a los 8 s |
+| 2026-10-22 | #5 | Modelo de datos con Prisma (`User`, `Airport`, `Flight`, `Shipment`, `TrackingEvent`), migración inicial y seed. No cambia ningún endpoint | Base para usuarios, vuelos y envíos de las próximas entregas |
+| 2026-10-22 | #6 | En `/details`, `aircraft` trae `photoUrl`, `photoThumbnailUrl`, `photoLink` y `photographer` de Planespotters. Si Planespotters no tiene foto, se usa la de adsbdb y `photoLink` y `photographer` llegan `null` | Las fotos de adsbdb a veces mostraban cabinas u otro avión; Planespotters exige mostrar el fotógrafo con enlace |
+| 2026-10-22 | #7 | Nuevo campo `type` en cada `AircraftState` (tipo ICAO, por ejemplo `B738`; `null` si no se conoce) | Elegir el ícono del avión en el mapa |
+| 2026-10-22 | #8 | Nuevo `GET /api/aircraft/:icao24/track` con el recorrido desde el despegue (`{ icao24, callsign, path: TrackPoint[] }`) y error `TRACK_NOT_FOUND` | Estela del vuelo con colores por altitud |
+| 2026-10-22 | #8 | Nuevo campo `departure` en `/details`: aeropuerto real del despegue (OurAirports), o `null`. La ruta de adsbdb solo se confirma si su origen está a menos de 30 km de ese despegue | adsbdb suele traer otro tramo del mismo número de vuelo; así no se inventa un destino |
