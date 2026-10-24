@@ -8,8 +8,10 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   CORS_ORIGIN: z.string().min(1),
-  // Opcional hasta el Bloque 5 (Prisma)
-  DATABASE_URL: z.string().optional(),
+  // Opcional: la API de aviones no usa la BD; si viene, debe ser una URL de PostgreSQL
+  DATABASE_URL: z
+    .url({ protocol: /^postgres(ql)?$/, error: 'debe ser una URL que empiece por postgresql:// o postgres://' })
+    .optional(),
   // Opcionales: sin credenciales OpenSky se usa en modo anónimo (Bloque 2)
   OPENSKY_CLIENT_ID: z.string().optional(),
   OPENSKY_CLIENT_SECRET: z.string().optional(),
