@@ -19,6 +19,13 @@ export function getUsAircraft(log: Logger): Promise<AircraftSnapshot> {
   return boxCache.getOrLoad('us', () => openSky.fetchByBox(US_BOX), log);
 }
 
+/** Aviones de una aerolínea por el prefijo ICAO de su indicativo (FDX = FedEx); sin código, todos */
+export function byAirline(aircraft: AircraftState[], code: unknown): AircraftState[] {
+  if (typeof code !== 'string' || code.trim() === '') return aircraft;
+  const prefix = code.trim().toUpperCase();
+  return aircraft.filter((a) => a.callsign?.startsWith(prefix) === true);
+}
+
 export async function getAircraftByIcao24(icao24: string, log: Logger): Promise<AircraftState> {
   // Primero la lista de EE. UU. (ya en caché por el mapa): seleccionar un avión no gasta créditos
   const fromMap = (await getUsAircraft(log)).aircraft.find((a) => a.icao24 === icao24);
