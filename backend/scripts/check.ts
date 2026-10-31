@@ -4,7 +4,7 @@ import { localToIso, toActiveFlight } from '../providers/aviationStack.provider.
 import { parseAircraftDb } from '../providers/aircraftDb.provider.ts';
 import { TtlCache } from '../utils/ttlCache.ts';
 import { toTrack } from '../providers/openSky.provider.ts';
-import { takeoffOf } from '../services/aircraft.service.ts';
+import { byAirline, takeoffOf } from '../services/aircraft.service.ts';
 import { parseAirports, splitCsvLine } from '../providers/airportDb.provider.ts';
 import { bearingDeg, computeProgress, distanceKm, nearestAirport } from '../services/flightDetails.service.ts';
 import type { AircraftState } from '../types/aircraft.ts';
@@ -116,6 +116,16 @@ assert.equal(computeProgress(detour, route).verified, false);
 assert.equal(computeProgress(detour, route, { lat: 41.97, lng: -87.9 }).verified, true);
 // Despegó de otro aeropuerto (Denver): la ruta de adsbdb es de otro tramo aunque la geometría encaje
 assert.equal(computeProgress(plane(42.2, -79.5), route, { lat: 39.86, lng: -104.67 }).verified, false);
+
+// Filtro por aerolínea: FDX = FedEx, sin código = todos, el prefijo no distingue mayúsculas
+const fleet = [
+  { ...plane(35, -90), callsign: 'FDX1234' },
+  { ...plane(36, -91), callsign: 'UAL19' },
+  { ...plane(37, -92), callsign: null },
+];
+assert.deepEqual(byAirline(fleet, 'fdx').map((a) => a.callsign), ['FDX1234']);
+assert.equal(byAirline(fleet, undefined).length, 3);
+assert.equal(byAirline(fleet, ['FDX', 'UAL']).length, 3);
 
 // CSV de OurAirports: comas y comillas dentro de un campo; solo aeropuertos grandes y medianos con vuelos regulares
 assert.deepEqual(splitCsvLine('1,"a, b","x ""y"""'), ['1', 'a, b', 'x "y"']);

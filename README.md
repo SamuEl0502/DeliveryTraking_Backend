@@ -150,7 +150,7 @@ Todas las respuestas son JSON y llevan el header `x-correlation-id`. Las rutas b
 | Método y ruta | Respuesta 200 |
 |---|---|
 | `GET /health` | `{ status: "ok", uptime, timestamp }` |
-| `GET /api/aircraft` | `{ time, count, aircraft: AircraftState[] }` con los aviones sobre EE. UU. continental |
+| `GET /api/aircraft?airline=FDX` | `{ time, count, aircraft: AircraftState[] }` con los aviones sobre EE. UU. continental. `airline` (opcional) deja solo los de esa aerolínea, por el prefijo ICAO de su indicativo (`FDX` = FedEx, `UAL` = United) |
 | `GET /api/aircraft/:icao24` | Un `AircraftState`. `icao24` son 6 caracteres hexadecimales (se aceptan mayúsculas). |
 | `GET /api/aircraft/:icao24/details` | `{ state, aircraft, route, progress, departure }` para el panel del avión. `departure` es el aeropuerto del que despegó según OpenSky, o `null`. No gasta Aviationstack. |
 | `GET /api/aircraft/:icao24/track` | `{ icao24, callsign, path: TrackPoint[] }`: recorrido del vuelo actual desde el despegue, con altitud en cada punto, para la estela por colores. 4 créditos de OpenSky de su propia cuenta y caché de 1 min. 404 `TRACK_NOT_FOUND` si OpenSky no lo tiene. |
@@ -291,3 +291,4 @@ Lo que cambió respecto al contrato inicial y por qué. Si el frontend usa algo 
 | 2026-10-22 | #7 | Nuevo campo `type` en cada `AircraftState` (tipo ICAO, por ejemplo `B738`; `null` si no se conoce) | Elegir el ícono del avión en el mapa |
 | 2026-10-22 | #8 | Nuevo `GET /api/aircraft/:icao24/track` con el recorrido desde el despegue (`{ icao24, callsign, path: TrackPoint[] }`) y error `TRACK_NOT_FOUND` | Estela del vuelo con colores por altitud |
 | 2026-10-22 | #8 | Nuevo campo `departure` en `/details`: aeropuerto real del despegue (OurAirports), o `null`. La ruta de adsbdb solo se confirma si su origen está a menos de 30 km de ese despegue | adsbdb suele traer otro tramo del mismo número de vuelo; así no se inventa un destino |
+| 2026-10-31 | — | Nuevo parámetro opcional `?airline=FDX` en `GET /api/aircraft`; `count` cuenta solo los aviones filtrados | Filtrar la lista por aerolínea (FedEx) |
