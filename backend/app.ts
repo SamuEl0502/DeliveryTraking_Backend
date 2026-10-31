@@ -7,6 +7,7 @@ import { rateLimiter } from './middlewares/rateLimiter.ts';
 import { errorHandler, notFound } from './middlewares/errorHandler.ts';
 import { healthRouter } from './routes/health.routes.ts';
 import { aircraftRouter } from './routes/aircraft.routes.ts';
+import { shipmentRouter } from './routes/shipment.routes.ts';
 
 export const app = express();
 
@@ -22,6 +23,7 @@ app.use('/health', healthRouter);
 
 app.use('/api', rateLimiter);
 app.use('/api/aircraft', aircraftRouter);
+app.use('/api/shipments', shipmentRouter);
 
 // Siempre al final: 404 y luego el manejador global de errores
 app.use(notFound);
