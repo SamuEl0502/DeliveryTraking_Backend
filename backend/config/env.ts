@@ -24,6 +24,11 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+  // Secretos distintos: el de access firma el JWT y el de refresh se usa para hashear el refresh token
+  JWT_ACCESS_SECRET: z.string().min(32, 'debe tener al menos 32 caracteres'),
+  JWT_REFRESH_SECRET: z.string().min(32, 'debe tener al menos 32 caracteres'),
+  ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
 });
 
 // "PORT=" en el .env llega como texto vacío: lo tratamos como no definido para usar el default
