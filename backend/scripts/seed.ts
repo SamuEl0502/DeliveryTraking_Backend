@@ -29,10 +29,18 @@ const FLIGHTS: {
   departure: string;
   arrival: string;
   status: FlightStatus;
+  capacityKg: string;
 }[] = [
-  { flightNumber: 'DT101', origin: 'ATL', destination: 'ORD', departure: '2026-10-24T14:00:00Z', arrival: '2026-10-24T16:05:00Z', status: 'SCHEDULED' },
-  { flightNumber: 'DT202', origin: 'MEM', destination: 'LAX', departure: '2026-10-24T18:30:00Z', arrival: '2026-10-24T22:40:00Z', status: 'SCHEDULED' },
-  { flightNumber: 'DT303', origin: 'SDF', destination: 'DFW', departure: '2026-10-20T12:00:00Z', arrival: '2026-10-20T14:35:00Z', status: 'LANDED' },
+  // Capacidades aproximadas según el avión: Boeing 757F, MD-11F, Boeing 767F, Airbus A300F y Cessna 208 (el pequeño sirve para probar minCapacityKg)
+  { flightNumber: 'DT101', origin: 'ATL', destination: 'ORD', departure: '2026-12-01T14:00:00Z', arrival: '2026-12-01T16:05:00Z', status: 'SCHEDULED', capacityKg: '39000.00' },
+  { flightNumber: 'DT102', origin: 'ATL', destination: 'ORD', departure: '2026-12-01T20:00:00Z', arrival: '2026-12-01T22:05:00Z', status: 'SCHEDULED', capacityKg: '1400.00' },
+  { flightNumber: 'DT103', origin: 'ATL', destination: 'LAX', departure: '2026-12-02T15:30:00Z', arrival: '2026-12-02T20:30:00Z', status: 'SCHEDULED', capacityKg: '52000.00' },
+  { flightNumber: 'DT104', origin: 'ATL', destination: 'JFK', departure: '2026-12-03T13:00:00Z', arrival: '2026-12-03T15:20:00Z', status: 'SCHEDULED', capacityKg: '39000.00' },
+  { flightNumber: 'DT202', origin: 'MEM', destination: 'LAX', departure: '2026-12-01T18:30:00Z', arrival: '2026-12-01T22:40:00Z', status: 'SCHEDULED', capacityKg: '90000.00' },
+  { flightNumber: 'DT203', origin: 'MEM', destination: 'JFK', departure: '2026-12-02T09:00:00Z', arrival: '2026-12-02T11:50:00Z', status: 'SCHEDULED', capacityKg: '48000.00' },
+  { flightNumber: 'DT303', origin: 'SDF', destination: 'DFW', departure: '2026-10-20T12:00:00Z', arrival: '2026-10-20T14:35:00Z', status: 'LANDED', capacityKg: '52000.00' },
+  { flightNumber: 'DT304', origin: 'SDF', destination: 'ORD', departure: '2026-12-02T12:00:00Z', arrival: '2026-12-02T13:20:00Z', status: 'SCHEDULED', capacityKg: '48000.00' },
+  { flightNumber: 'DT401', origin: 'CVG', destination: 'ATL', departure: '2026-12-03T17:00:00Z', arrival: '2026-12-03T18:40:00Z', status: 'SCHEDULED', capacityKg: '39000.00' },
 ];
 
 // Cada envío con su historial; TOOK_OFF y LANDED son automáticos (sin Staff)
@@ -50,7 +58,7 @@ const SHIPMENTS: {
     weightKg: '1.20',
     flightNumber: 'DT101',
     status: 'RECEIVED',
-    events: [{ type: 'RECEIVED', at: '2026-10-24T10:15:00Z', where: 'origin' }],
+    events: [{ type: 'RECEIVED', at: '2026-11-05T10:15:00Z', where: 'origin' }],
   },
   {
     trackingCode: 'DT-D4E5F6',
@@ -59,8 +67,8 @@ const SHIPMENTS: {
     flightNumber: 'DT202',
     status: 'LOADED',
     events: [
-      { type: 'RECEIVED', at: '2026-10-24T13:00:00Z', where: 'origin' },
-      { type: 'LOADED', at: '2026-10-24T17:45:00Z', where: 'origin' },
+      { type: 'RECEIVED', at: '2026-11-05T13:00:00Z', where: 'origin' },
+      { type: 'LOADED', at: '2026-11-06T09:45:00Z', where: 'origin' },
     ],
   },
   {
@@ -126,6 +134,7 @@ try {
       scheduledDeparture: new Date(f.departure),
       scheduledArrival: new Date(f.arrival),
       status: f.status,
+      capacityKg: f.capacityKg,
     };
     const saved = await prisma.flight.upsert({
       where: { flightNumber_scheduledDeparture: { flightNumber: data.flightNumber, scheduledDeparture: data.scheduledDeparture } },
@@ -165,6 +174,15 @@ try {
     ]);
     eventCount += s.events.length;
   }
+
+  // Si cambia la fecha de un vuelo, el upsert crea otra fila: se borra la vieja, que ya quedó sin envíos
+  await prisma.flight.deleteMany({
+    where: {
+      flightNumber: { in: FLIGHTS.map((f) => f.flightNumber) },
+      id: { notIn: [...flightIds.values()].map((f) => f.id) },
+      shipments: { none: {} },
+    },
+  });
 
   console.log(
     `seed: ${AIRPORTS.length} aeropuertos, 2 usuarios, ${FLIGHTS.length} vuelos, ${SHIPMENTS.length} envíos, ${eventCount} eventos`,
