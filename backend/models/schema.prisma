@@ -91,6 +91,8 @@ model Flight {
   scheduledDeparture DateTime
   scheduledArrival   DateTime
   status             FlightStatus @default(SCHEDULED)
+  /// Carga máxima en kg; la restante se calcula restando los pesos de sus envíos
+  capacityKg         Decimal      @db.Decimal(8, 2)
 
   // Último estado conocido del avión; se guarda cada 30-60 s o al cambiar de estado, no en cada ciclo
   lastKnownLat      Float?
