@@ -7,6 +7,7 @@ import { toTrack } from '../providers/openSky.provider.ts';
 import { byAirline, takeoffOf } from '../services/aircraft.service.ts';
 import { parseAirports, splitCsvLine } from '../providers/airportDb.provider.ts';
 import { bearingDeg, computeProgress, distanceKm, nearestAirport } from '../services/flightDetails.service.ts';
+import { createShipmentBodySchema } from '../validators/shipment.validator.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 
 // Prueba rápida del panel (geometría y elección del vuelo de Aviationstack): npm run check
@@ -148,5 +149,12 @@ const sea = { icao: 'KSEA', iata: 'SEA', name: 'Seattle-Tacoma', city: 'Seattle'
 const dal803 = { callsign: 'DAL803', flightNumber: 'DL803', airline: null, origin: lax, destination: sea };
 const overWashington = { ...plane(46.3744, -120.0991), callsign: 'DAL803', hdg: 300 };
 assert.equal(computeProgress(overWashington, dal803, { lat: 32.9099, lng: -97.0547 }).verified, false);
+
+// Crear envío: pesos con hasta 2 decimales, y el dueño nunca se acepta desde el body
+const shipmentBody = { description: 'Caja', flightId: '00000000-0000-4000-8000-000000000000' };
+const validWeight = (weightKg: unknown) => createShipmentBodySchema.safeParse({ ...shipmentBody, weightKg }).success;
+for (const w of [0.01, 1.2, 19.99, 1.1, 999999.99]) assert.equal(validWeight(w), true, `peso ${w}`);
+for (const w of [0, -1, 1.234, 1000000, '5']) assert.equal(validWeight(w), false, `peso ${w}`);
+assert.equal('ownerId' in createShipmentBodySchema.parse({ ...shipmentBody, weightKg: 1, ownerId: 'otro' }), false);
 
 console.log('check OK');
