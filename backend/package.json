@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit",
     "fixture:save": "tsx scripts/saveFixture.ts",
     "check": "tsx scripts/check.ts",
+    "test:integration": "tsx scripts/integration.ts",
     "postinstall": "prisma generate",
     "db:up": "docker compose -f ../docker-compose.yml up -d --wait",
     "db:migrate": "prisma migrate dev",
