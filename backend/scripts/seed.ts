@@ -1,8 +1,10 @@
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import type { FlightStatus, ShipmentStatus, TrackingEventType } from '@prisma/client';
 import { argon2id, hash } from 'argon2';
 
-// Datos de prueba para desarrollo: npm run db:seed (se puede correr varias veces sin duplicar)
+// Datos de prueba para desarrollo: npm run db:seed deja la base lista para la demo.
+// Se puede correr varias veces, pero borra los envíos que no están aquí y reinicia las versiones
 
 // Coordenadas de OurAirports (dominio público): https://ourairports.com/data/
 const AIRPORTS = [
@@ -48,7 +50,9 @@ const SHIPMENTS: {
   trackingCode: string;
   description: string;
   weightKg: string;
-  flightNumber: string;
+  flightNumber: string | null;
+  /** Solo para envíos sin vuelo; los demás toman la ruta de su vuelo */
+  route?: { origin: string; destination: string };
   status: ShipmentStatus;
   events: { type: TrackingEventType; at: string; where: 'origin' | 'destination'; note?: string }[];
 }[] = [
@@ -86,6 +90,34 @@ const SHIPMENTS: {
       { type: 'DELIVERED', at: '2026-10-20T18:40:00Z', where: 'destination', note: 'Entregado en recepción' },
     ],
   },
+  // Para la demo de asignación con el Staff de ATL: reasignar de DT101 a DT102
+  {
+    trackingCode: 'DT-K2M4P6',
+    description: 'Paquete de ropa',
+    weightKg: '12.50',
+    flightNumber: 'DT101',
+    status: 'RECEIVED',
+    events: [{ type: 'RECEIVED', at: '2026-11-06T08:00:00Z', where: 'origin' }],
+  },
+  // No cabe en DT102 (1400 kg): muestra INSUFFICIENT_CAPACITY
+  {
+    trackingCode: 'DT-Q7R8S9',
+    description: 'Maquinaria industrial',
+    weightKg: '1500.00',
+    flightNumber: 'DT101',
+    status: 'RECEIVED',
+    events: [{ type: 'RECEIVED', at: '2026-11-06T08:30:00Z', where: 'origin' }],
+  },
+  // Sin vuelo: asignarlo a DT101 o DT102 genera el evento ASSIGNED
+  {
+    trackingCode: 'DT-T3V5W6',
+    description: 'Equipos de oficina',
+    weightKg: '45.00',
+    flightNumber: null,
+    route: { origin: 'ATL', destination: 'ORD' },
+    status: 'RECEIVED',
+    events: [{ type: 'RECEIVED', at: '2026-11-06T09:00:00Z', where: 'origin' }],
+  },
 ];
 
 const AUTOMATIC: TrackingEventType[] = ['TOOK_OFF', 'LANDED'];
@@ -93,6 +125,20 @@ const AUTOMATIC: TrackingEventType[] = ['TOOK_OFF', 'LANDED'];
 const prisma = new PrismaClient();
 
 try {
+  // Este script borra envíos: nunca debe tocar datos reales
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('el seed no se puede correr con NODE_ENV=production');
+  }
+
+  // Quita lo que dejaron los ensayos anteriores para que la demo siempre empiece igual
+  const seedCodes = { trackingCode: { notIn: SHIPMENTS.map((s) => s.trackingCode) } };
+  await prisma.$transaction([
+    prisma.trackingEvent.deleteMany({ where: { shipment: seedCodes } }),
+    prisma.shipment.deleteMany({ where: seedCodes }),
+    prisma.flight.updateMany({ data: { version: 0 } }),
+    prisma.shipment.updateMany({ data: { version: 0 } }),
+  ]);
+
   // upsert: se puede correr varias veces sin duplicar
   const airportId = new Map<string, string>();
   for (const airport of AIRPORTS) {
@@ -155,16 +201,18 @@ try {
 
   let eventCount = 0;
   for (const s of SHIPMENTS) {
-    const flight = flightIds.get(s.flightNumber);
-    if (!flight) throw new Error(`vuelo ${s.flightNumber} no está en el seed`);
+    const flight = s.flightNumber ? flightIds.get(s.flightNumber) : null;
+    if (s.flightNumber && !flight) throw new Error(`vuelo ${s.flightNumber} no está en el seed`);
+    const route = flight ?? (s.route && { originId: idOf(s.route.origin), destinationId: idOf(s.route.destination) });
+    if (!route) throw new Error(`el envío ${s.trackingCode} no tiene vuelo ni ruta`);
     const data = {
       trackingCode: s.trackingCode,
       description: s.description,
       weightKg: s.weightKg,
       ownerId: savedClient.id,
-      flightId: flight.id,
-      originId: flight.originId,
-      destinationId: flight.destinationId,
+      flightId: flight?.id ?? null,
+      originId: route.originId,
+      destinationId: route.destinationId,
       status: s.status,
     };
     const shipment = await prisma.shipment.upsert({ where: { trackingCode: s.trackingCode }, update: data, create: data });
@@ -178,7 +226,7 @@ try {
           type: e.type,
           occurredAt: new Date(e.at),
           note: e.note ?? null,
-          airportId: e.where === 'origin' ? flight.originId : flight.destinationId,
+          airportId: e.where === 'origin' ? route.originId : route.destinationId,
           createdById: AUTOMATIC.includes(e.type) ? null : savedStaff.id,
         })),
       }),
