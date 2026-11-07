@@ -3,12 +3,14 @@ import { Prisma } from '@prisma/client';
 import type { FlightStatus, ShipmentStatus, TrackingEventType } from '@prisma/client';
 import * as flightRepository from '../repositories/flight.repository.ts';
 import * as shipmentRepository from '../repositories/shipment.repository.ts';
-import type { FlightAvailability, ShipmentRecord } from '../repositories/shipment.repository.ts';
-import type { AvailableFlightList } from '../types/shipment.ts';
+import * as userRepository from '../repositories/user.repository.ts';
+import type { FlightAvailability, ShipmentRecord, ShipmentSummaryRecord } from '../repositories/shipment.repository.ts';
+import type { AvailableFlightList, ShipmentList } from '../types/shipment.ts';
 import { AppError } from '../utils/AppError.ts';
 import type { FlightListQuery } from '../validators/flight.validator.ts';
-import type { CreateShipmentInput } from '../validators/shipment.validator.ts';
+import type { CreateShipmentInput, MyShipmentsQuery, ShipmentListQuery } from '../validators/shipment.validator.ts';
 import { toFlight } from './flight.service.ts';
+import type { AuthUser } from './token.service.ts';
 
 // Respuesta de GET /api/shipments/:trackingCode (fechas en ISO, UTC)
 export interface ShipmentAirport {
@@ -56,6 +58,42 @@ export async function getByTrackingCode(trackingCode: string): Promise<ShipmentD
     throw new AppError(404, 'SHIPMENT_NOT_FOUND', `No existe un envío con el código ${trackingCode}`);
   }
   return toDetail(shipment);
+}
+
+// Envíos del usuario autenticado. Staff y Admin no son dueños de envíos: reciben la lista vacía
+export async function listMine(ownerId: string, { page, limit }: MyShipmentsQuery): Promise<ShipmentList> {
+  const [records, total] = await shipmentRepository.findPage({ ownerId }, page, limit);
+  return toList(records, total, page, limit);
+}
+
+// Admin ve todos. Staff solo los que salen de su aeropuerto, que se lee de la base porque no viaja en el token
+export async function list(actor: AuthUser, { status, page, limit }: ShipmentListQuery): Promise<ShipmentList> {
+  let originId: string | undefined;
+  if (actor.role !== 'ADMIN') {
+    const user = await userRepository.findById(actor.id);
+    if (!user?.airportId) {
+      throw new AppError(403, 'FORBIDDEN_AIRPORT', 'No tienes un aeropuerto asignado');
+    }
+    originId = user.airportId;
+  }
+  const [records, total] = await shipmentRepository.findPage({ originId, status }, page, limit);
+  return toList(records, total, page, limit);
+}
+
+function toList(records: ShipmentSummaryRecord[], total: number, page: number, limit: number): ShipmentList {
+  return {
+    shipments: records.map((s) => ({
+      id: s.id,
+      trackingCode: s.trackingCode,
+      status: s.status,
+      weightKg: s.weightKg.toNumber(),
+      createdAt: s.createdAt.toISOString(),
+      origin: s.origin,
+      destination: s.destination,
+      hasFlight: s.flightId !== null,
+    })),
+    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+  };
 }
 
 // Sin letras ni números que se confundan al leerlos (I, O, 0, 1)

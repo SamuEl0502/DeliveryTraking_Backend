@@ -22,3 +22,23 @@ export interface AvailableFlightList {
   flights: AvailableFlight[];
   pagination: FlightList['pagination'];
 }
+
+export type ShipmentStatus = 'RECEIVED' | 'LOADED' | 'IN_FLIGHT' | 'UNLOADED' | 'DELIVERED';
+
+// Fila de un listado de envíos. origin y destination son la ruta del envío, no la de su vuelo
+export interface ShipmentSummary {
+  id: string;
+  trackingCode: string;
+  status: ShipmentStatus;
+  weightKg: number;
+  createdAt: string;
+  origin: FlightAirport;
+  destination: FlightAirport;
+  hasFlight: boolean;
+}
+
+// Contrato de GET /api/shipments/mine y GET /api/shipments (del más reciente al más antiguo)
+export interface ShipmentList {
+  shipments: ShipmentSummary[];
+  pagination: FlightList['pagination'];
+}
