@@ -6,8 +6,8 @@ import { flightIdParamsSchema } from '../validators/flight.validator.ts';
 
 export const flightRouter = Router();
 
-// La capacidad de los vuelos es un dato de operación: solo para Staff
-flightRouter.use(requireAuth, requireRole('STAFF'));
+// La capacidad de los vuelos es un dato de operación: solo para Staff y Admin
+flightRouter.use(requireAuth, requireRole('STAFF', 'ADMIN'));
 
 flightRouter.get('/', listFlights);
 flightRouter.get('/:id', validateParams(flightIdParamsSchema), getFlight);

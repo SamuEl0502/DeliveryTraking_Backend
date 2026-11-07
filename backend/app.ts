@@ -11,6 +11,7 @@ import { aircraftRouter } from './routes/aircraft.routes.ts';
 import { shipmentRouter } from './routes/shipment.routes.ts';
 import { authRouter } from './routes/auth.routes.ts';
 import { flightRouter } from './routes/flight.routes.ts';
+import { assignmentRouter } from './routes/assignment.routes.ts';
 
 export const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/aircraft', aircraftRouter);
 app.use('/api/shipments', shipmentRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/flights', flightRouter);
+app.use('/api/assignments', assignmentRouter);
 
 // Siempre al final: 404 y luego el manejador global de errores
 app.use(notFound);

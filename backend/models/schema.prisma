@@ -13,6 +13,7 @@ datasource db {
 enum Role {
   CLIENT
   STAFF
+  ADMIN
 }
 
 enum FlightStatus {
@@ -40,6 +41,9 @@ enum TrackingEventType {
   UNLOADED
   DELIVERED
   ALERT
+  ASSIGNED
+  REASSIGNED
+  UNASSIGNED
 }
 
 model User {
@@ -74,6 +78,9 @@ model Airport {
   arrivals   Flight[]        @relation("FlightDestination")
   staff      User[]
   events     TrackingEvent[]
+
+  shipmentOrigins      Shipment[] @relation("ShipmentOrigin")
+  shipmentDestinations Shipment[] @relation("ShipmentDestination")
 }
 
 model Flight {
@@ -125,6 +132,11 @@ model Shipment {
   owner        User           @relation(fields: [ownerId], references: [id])
   flightId     String?
   flight       Flight?        @relation(fields: [flightId], references: [id])
+  /// La ruta es del envío, no del vuelo: se conserva aunque se desasigne, y solo admite vuelos con esta misma ruta
+  originId      String
+  origin        Airport       @relation("ShipmentOrigin", fields: [originId], references: [id])
+  destinationId String
+  destination   Airport       @relation("ShipmentDestination", fields: [destinationId], references: [id])
   status       ShipmentStatus @default(RECEIVED)
   /// Bloqueo optimista: se incrementa en cada cambio de estado
   version      Int            @default(0)

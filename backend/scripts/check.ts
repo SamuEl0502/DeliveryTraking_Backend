@@ -7,6 +7,7 @@ import { toTrack } from '../providers/openSky.provider.ts';
 import { byAirline, takeoffOf } from '../services/aircraft.service.ts';
 import { parseAirports, splitCsvLine } from '../providers/airportDb.provider.ts';
 import { bearingDeg, computeProgress, distanceKm, nearestAirport } from '../services/flightDetails.service.ts';
+import { createAssignmentBodySchema } from '../validators/assignment.validator.ts';
 import { createShipmentBodySchema } from '../validators/shipment.validator.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 
@@ -156,5 +157,12 @@ const validWeight = (weightKg: unknown) => createShipmentBodySchema.safeParse({ 
 for (const w of [0.01, 1.2, 19.99, 1.1, 999999.99]) assert.equal(validWeight(w), true, `peso ${w}`);
 for (const w of [0, -1, 1.234, 1000000, '5']) assert.equal(validWeight(w), false, `peso ${w}`);
 assert.equal('ownerId' in createShipmentBodySchema.parse({ ...shipmentBody, weightKg: 1, ownerId: 'otro' }), false);
+
+// Asignar: expectedFlightVersion debe ser un entero desde 0 y como número, no como texto
+const uuid = '00000000-0000-4000-8000-000000000000';
+const validVersion = (expectedFlightVersion: unknown) =>
+  createAssignmentBodySchema.safeParse({ shipmentId: uuid, flightId: uuid, expectedFlightVersion }).success;
+for (const v of [0, 1, 250]) assert.equal(validVersion(v), true, `version ${v}`);
+for (const v of [-1, 1.5, '1', undefined]) assert.equal(validVersion(v), false, `version ${v}`);
 
 console.log('check OK');

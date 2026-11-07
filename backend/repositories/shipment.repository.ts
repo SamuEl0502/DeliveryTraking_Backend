@@ -12,7 +12,8 @@ const airportSelect = {
   timezone: true,
 } satisfies Prisma.AirportSelect;
 
-const shipmentSelect = {
+export const shipmentSelect = {
+  id: true,
   trackingCode: true,
   description: true,
   weightKg: true,
@@ -75,7 +76,7 @@ export function createOnFlight(
 
     const flight = await tx.flight.findUniqueOrThrow({
       where: { id: flightId },
-      select: { status: true, capacityKg: true, originId: true },
+      select: { status: true, capacityKg: true, originId: true, destinationId: true },
     });
     const { _sum } = await tx.shipment.aggregate({ where: { flightId }, _sum: { weightKg: true } });
     // La suma es null cuando el vuelo aún no tiene envíos
@@ -83,7 +84,12 @@ export function createOnFlight(
     authorize({ status: flight.status, availableKg });
 
     return tx.shipment.create({
-      data: { ...shipment, events: { create: { type: 'RECEIVED', airportId: flight.originId } } },
+      data: {
+        ...shipment,
+        originId: flight.originId,
+        destinationId: flight.destinationId,
+        events: { create: { type: 'RECEIVED', airportId: flight.originId } },
+      },
       select: shipmentSelect,
     });
   });
