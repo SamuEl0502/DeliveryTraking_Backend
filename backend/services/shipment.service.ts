@@ -30,6 +30,7 @@ export interface ShipmentEvent {
 }
 
 export interface ShipmentDetail {
+  id: string;
   trackingCode: string;
   description: string;
   weightKg: number;
@@ -128,8 +129,9 @@ export async function listAvailableFlights(query: FlightListQuery): Promise<Avai
 }
 
 // Prisma devuelve el peso como Decimal y las fechas como Date: aquí quedan en número y texto
-function toDetail(s: ShipmentRecord): ShipmentDetail {
+export function toDetail(s: ShipmentRecord): ShipmentDetail {
   return {
+    id: s.id,
     trackingCode: s.trackingCode,
     description: s.description,
     weightKg: s.weightKg.toNumber(),

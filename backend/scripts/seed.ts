@@ -124,6 +124,15 @@ try {
   };
   const savedClient = await prisma.user.upsert({ where: { email: client.email }, update: client, create: client });
   const savedStaff = await prisma.user.upsert({ where: { email: staff.email }, update: staff, create: staff });
+  // Admin sin aeropuerto: no tiene límite de alcance
+  const admin = {
+    email: 'admin@deliverytracking.test',
+    name: 'Admin de Prueba',
+    role: 'ADMIN' as const,
+    airportId: null,
+    passwordHash,
+  };
+  await prisma.user.upsert({ where: { email: admin.email }, update: admin, create: admin });
 
   const flightIds = new Map<string, { id: string; originId: string; destinationId: string }>();
   for (const f of FLIGHTS) {
@@ -154,6 +163,8 @@ try {
       weightKg: s.weightKg,
       ownerId: savedClient.id,
       flightId: flight.id,
+      originId: flight.originId,
+      destinationId: flight.destinationId,
       status: s.status,
     };
     const shipment = await prisma.shipment.upsert({ where: { trackingCode: s.trackingCode }, update: data, create: data });
@@ -185,7 +196,7 @@ try {
   });
 
   console.log(
-    `seed: ${AIRPORTS.length} aeropuertos, 2 usuarios, ${FLIGHTS.length} vuelos, ${SHIPMENTS.length} envíos, ${eventCount} eventos`,
+    `seed: ${AIRPORTS.length} aeropuertos, 3 usuarios, ${FLIGHTS.length} vuelos, ${SHIPMENTS.length} envíos, ${eventCount} eventos`,
   );
 } catch (err) {
   console.error('seed falló:', err);

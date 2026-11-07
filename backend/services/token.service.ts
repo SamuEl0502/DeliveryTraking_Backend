@@ -17,7 +17,7 @@ export const REFRESH_TOKEN_MAX_AGE_MS = env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 6
 // Se revisa el contenido del JWT aunque la firma sea válida, para no confiar en su forma
 const accessPayloadSchema = z.object({
   sub: z.string().min(1),
-  role: z.enum(['CLIENT', 'STAFF']),
+  role: z.enum(['CLIENT', 'STAFF', 'ADMIN']),
 });
 
 // ---------- Access token (JWT) ----------
