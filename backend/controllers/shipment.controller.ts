@@ -2,10 +2,14 @@ import type { Request, Response } from 'express';
 import type { z } from 'zod';
 import * as shipmentService from '../services/shipment.service.ts';
 import type { ShipmentDetail } from '../services/shipment.service.ts';
-import type { AvailableFlightList } from '../types/shipment.ts';
+import type { AvailableFlightList, ShipmentList } from '../types/shipment.ts';
 import { AppError } from '../utils/AppError.ts';
 import { flightListQuerySchema } from '../validators/flight.validator.ts';
-import { createShipmentBodySchema } from '../validators/shipment.validator.ts';
+import {
+  createShipmentBodySchema,
+  myShipmentsQuerySchema,
+  shipmentListQuerySchema,
+} from '../validators/shipment.validator.ts';
 
 // Mismo formato de error que validateParams
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
@@ -31,6 +35,22 @@ export async function createShipment(req: Request, res: Response<ShipmentDetail>
   }
   const input = parse(createShipmentBodySchema, req.body);
   res.status(201).json(await shipmentService.create(input, req.user.id));
+}
+
+// Envíos del usuario del token; nunca de un id que llegue en la URL
+export async function getMyShipments(req: Request, res: Response<ShipmentList>): Promise<void> {
+  if (!req.user) {
+    throw new AppError(401, 'UNAUTHORIZED', 'Debes iniciar sesión');
+  }
+  res.json(await shipmentService.listMine(req.user.id, parse(myShipmentsQuerySchema, req.query)));
+}
+
+// Listado de Staff y Admin; el alcance por aeropuerto lo decide el service según el rol
+export async function listShipments(req: Request, res: Response<ShipmentList>): Promise<void> {
+  if (!req.user) {
+    throw new AppError(401, 'UNAUTHORIZED', 'Debes iniciar sesión');
+  }
+  res.json(await shipmentService.list(req.user, parse(shipmentListQuerySchema, req.query)));
 }
 
 // Vuelos que el cliente puede elegir al crear un envío; de aquí obtiene el flightId
