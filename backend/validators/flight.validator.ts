@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { icao24ParamsSchema } from './aircraft.validator.ts';
 
 const iataCode = (field: string) =>
   z
@@ -34,3 +35,18 @@ export type FlightListQuery = z.infer<typeof flightListQuerySchema>;
 export const flightIdParamsSchema = z.object({
   id: z.uuid('id debe ser un UUID válido'),
 });
+
+// Versión del vuelo que el cliente vio; el bloqueo optimista la compara con la actual
+const expectedVersion = z
+  .number('expectedVersion debe ser un número')
+  .int('expectedVersion debe ser un entero')
+  .min(0, 'expectedVersion no puede ser negativo');
+
+export const flightAircraftBodySchema = z.object({
+  icao24: icao24ParamsSchema.shape.icao24,
+  expectedVersion,
+});
+
+export const flightAircraftUnlinkBodySchema = z.object({ expectedVersion });
+
+export type FlightAircraftInput = z.infer<typeof flightAircraftBodySchema>;
