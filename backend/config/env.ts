@@ -19,6 +19,12 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   // Opcional: sin llave, GET /api/aircraft/:icao24/schedule responde 503
   AVIATIONSTACK_API_KEY: z.string().optional(),
+  // Opcional: sin llave (y sin USE_FIXTURE), GET /api/schedules responde 503
+  AIRLABS_API_KEY: z.string().optional(),
+  // Tiempo en que la misma ruta no vuelve a consultar AirLabs (40 minutos)
+  SCHEDULE_CACHE_TTL_MS: z.coerce.number().int().positive().default(2_400_000),
+  // Tope de consultas reales a AirLabs por día (0 = no llamar nunca)
+  SCHEDULE_DAILY_LIMIT: z.coerce.number().int().min(0).default(30),
   // Plan B de demo: servir fixtures/opensky-sample.json en vez de llamar a OpenSky
   USE_FIXTURE: z
     .enum(['true', 'false'])
