@@ -8,6 +8,7 @@ import { byAirline, takeoffOf } from '../services/aircraft.service.ts';
 import { parseAirports, splitCsvLine } from '../providers/airportDb.provider.ts';
 import { bearingDeg, computeProgress, distanceKm, nearestAirport } from '../services/flightDetails.service.ts';
 import { isComplete } from '../services/flight.service.ts';
+import { liveFrom } from '../services/tracking.service.ts';
 import type { Flight } from '../types/flight.ts';
 import { createAssignmentBodySchema } from '../validators/assignment.validator.ts';
 import { createShipmentBodySchema } from '../validators/shipment.validator.ts';
@@ -187,5 +188,13 @@ assert.equal(isComplete({ ...complete, callsign: null }), false);
 assert.equal(isComplete({ ...complete, aircraftIcao24: null }), true);
 assert.equal(isComplete({ ...complete, origin: { ...airport, iataCode: '' } }), false);
 assert.equal(isComplete({ ...complete, destination: { ...airport, iataCode: '' } }), false);
+
+// Posición en vivo del envío: solo los campos de live si el avión está en la lista; si no, no_position
+assert.deepEqual(liveFrom('a39bfa', [plane(40, -80)]), {
+  live: { lat: 40, lng: -80, hdg: 90, spd: 230, alt: 11000, onGround: false, ts: 0 },
+  reason: null,
+});
+assert.deepEqual(liveFrom('ffffff', [plane(40, -80)]), { live: null, reason: 'no_position' });
+assert.deepEqual(liveFrom('a39bfa', []), { live: null, reason: 'no_position' });
 
 console.log('check OK');

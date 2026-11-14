@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma.ts';
 
-const airportSelect = {
+export const airportSelect = {
   iataCode: true,
   icaoCode: true,
   name: true,
