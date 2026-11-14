@@ -7,6 +7,8 @@ import { toTrack } from '../providers/openSky.provider.ts';
 import { byAirline, takeoffOf } from '../services/aircraft.service.ts';
 import { parseAirports, splitCsvLine } from '../providers/airportDb.provider.ts';
 import { bearingDeg, computeProgress, distanceKm, nearestAirport } from '../services/flightDetails.service.ts';
+import { isComplete } from '../services/flight.service.ts';
+import type { Flight } from '../types/flight.ts';
 import { createAssignmentBodySchema } from '../validators/assignment.validator.ts';
 import { createShipmentBodySchema } from '../validators/shipment.validator.ts';
 import type { AircraftState } from '../types/aircraft.ts';
@@ -164,5 +166,18 @@ const validVersion = (expectedFlightVersion: unknown) =>
   createAssignmentBodySchema.safeParse({ shipmentId: uuid, flightId: uuid, expectedFlightVersion }).success;
 for (const v of [0, 1, 250]) assert.equal(validVersion(v), true, `version ${v}`);
 for (const v of [-1, 1.5, '1', undefined]) assert.equal(validVersion(v), false, `version ${v}`);
+
+// Vuelos incompletos: sin indicativo o sin código IATA en un extremo, no se listan; sin avión sí (se asigna después)
+const airport = { iataCode: 'LAX', icaoCode: 'KLAX', name: 'LAX', city: 'Los Angeles', lat: 33.94, lng: -118.41, timezone: 'America/Los_Angeles' };
+const complete: Flight = {
+  id: uuid, flightNumber: 'AA100', callsign: 'AAL100', aircraftIcao24: 'a39bfa', status: 'SCHEDULED',
+  scheduledDeparture: '2026-11-13T10:00:00.000Z', scheduledArrival: '2026-11-13T12:00:00.000Z',
+  origin: airport, destination: { ...airport, iataCode: 'SFO' }, capacityKg: 100, assignedKg: 0, remainingCapacityKg: 100, version: 0,
+};
+assert.equal(isComplete(complete), true);
+assert.equal(isComplete({ ...complete, callsign: null }), false);
+assert.equal(isComplete({ ...complete, aircraftIcao24: null }), true);
+assert.equal(isComplete({ ...complete, origin: { ...airport, iataCode: '' } }), false);
+assert.equal(isComplete({ ...complete, destination: { ...airport, iataCode: '' } }), false);
 
 console.log('check OK');
