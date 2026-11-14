@@ -9,6 +9,7 @@ import { parseAirports, splitCsvLine } from '../providers/airportDb.provider.ts'
 import { bearingDeg, computeProgress, distanceKm, nearestAirport } from '../services/flightDetails.service.ts';
 import { isComplete } from '../services/flight.service.ts';
 import { liveFrom } from '../services/tracking.service.ts';
+import { nextTransition } from '../jobs/flightWatcher.ts';
 import type { Flight } from '../types/flight.ts';
 import { createAssignmentBodySchema } from '../validators/assignment.validator.ts';
 import { createShipmentBodySchema } from '../validators/shipment.validator.ts';
@@ -196,5 +197,25 @@ assert.deepEqual(liveFrom('a39bfa', [plane(40, -80)]), {
 });
 assert.deepEqual(liveFrom('ffffff', [plane(40, -80)]), { live: null, reason: 'no_position' });
 assert.deepEqual(liveFrom('a39bfa', []), { live: null, reason: 'no_position' });
+
+// Flight watcher: despegue solo en el aire, en SCHEDULED y cerca de la hora programada; aterrizaje en tierra estando DEPARTED
+const nowMs = Date.parse('2026-11-13T10:00:00Z');
+const fresh = (onGround: boolean): AircraftState => ({ ...plane(40, -80), onGround, ts: nowMs / 1000 - 30 });
+const watched = (status: 'SCHEDULED' | 'DEPARTED', departure = '2026-11-13T09:50:00Z') => ({ status, scheduledDeparture: new Date(departure) });
+assert.equal(nextTransition(watched('SCHEDULED'), fresh(false), nowMs), 'takeoff');
+assert.equal(nextTransition(watched('SCHEDULED'), fresh(true), nowMs), null);
+assert.equal(nextTransition(watched('DEPARTED'), fresh(true), nowMs), 'landing');
+assert.equal(nextTransition(watched('DEPARTED'), fresh(false), nowMs), null);
+assert.equal(nextTransition(watched('SCHEDULED'), undefined, nowMs), null);
+// Posición de hace 5 min: la caché quedó vieja, no se decide nada
+assert.equal(nextTransition(watched('DEPARTED'), { ...fresh(true), ts: nowMs / 1000 - 300 }, nowMs), null);
+// El avión vuela otro tramo: el vuelo sale mañana o salía hace 2 días
+assert.equal(nextTransition(watched('SCHEDULED', '2026-11-14T10:00:00Z'), fresh(false), nowMs), null);
+assert.equal(nextTransition(watched('SCHEDULED', '2026-11-11T10:00:00Z'), fresh(false), nowMs), null);
+// peek devuelve lo guardado aunque esté vencido, sin cargar
+const peekCache = new TtlCache<number>(0);
+assert.equal(peekCache.peek('k'), undefined);
+await peekCache.getOrLoad('k', async () => 7, silent);
+assert.equal(peekCache.peek('k'), 7);
 
 console.log('check OK');

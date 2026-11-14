@@ -19,6 +19,11 @@ export function getUsAircraft(log: Logger): Promise<AircraftSnapshot> {
   return boxCache.getOrLoad('us', () => openSky.fetchByBox(US_BOX), log);
 }
 
+/** Lo que el mapa ya trajo de OpenSky, sin pedir nada nuevo; undefined si nadie lo ha pedido aún */
+export function peekUsAircraft(): AircraftSnapshot | undefined {
+  return boxCache.peek('us');
+}
+
 /** Aviones de una aerolínea por el prefijo ICAO de su indicativo (FDX = FedEx); sin código, todos */
 export function byAirline(aircraft: AircraftState[], code: unknown): AircraftState[] {
   if (typeof code !== 'string' || code.trim() === '') return aircraft;
