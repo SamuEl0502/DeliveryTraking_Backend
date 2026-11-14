@@ -12,6 +12,11 @@ export class TtlCache<T> {
 
   constructor(private readonly ttlMs: number) {}
 
+  /** Último valor guardado, aunque esté vencido; nunca llama a la fuente */
+  peek(key: string): T | undefined {
+    return this.entries.get(key)?.value;
+  }
+
   async getOrLoad(key: string, loader: () => Promise<T>, log: Logger): Promise<T> {
     const entry = this.entries.get(key);
     if (entry && entry.expiresAt > Date.now()) {

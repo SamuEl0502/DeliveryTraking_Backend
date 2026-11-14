@@ -1,6 +1,7 @@
 import { app } from './app.ts';
 import { env } from './config/env.ts';
 import { logger } from './config/logger.ts';
+import { startFlightWatcher } from './jobs/flightWatcher.ts';
 import { loadAircraftDb } from './providers/aircraftDb.provider.ts';
 import { loadAirportDb } from './providers/airportDb.provider.ts';
 
@@ -11,6 +12,7 @@ const server = app.listen(env.PORT, () => {
 // En segundo plano: la API responde mientras carga (los aviones salen con type null hasta entonces)
 void loadAircraftDb();
 void loadAirportDb();
+startFlightWatcher(logger);
 
 // Cierre ordenado: deja terminar las peticiones en curso antes de salir
 function shutdown(signal: string): void {
