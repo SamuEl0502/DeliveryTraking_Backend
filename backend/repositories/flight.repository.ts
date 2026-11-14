@@ -22,6 +22,7 @@ const flightSelect = {
   scheduledArrival: true,
   capacityKg: true,
   version: true,
+  originId: true,
   origin: { select: airportSelect },
   destination: { select: airportSelect },
   shipments: { select: { weightKg: true } },
@@ -55,4 +56,13 @@ export function findMany({ origin, destination, date }: FlightFilters): Promise<
 
 export function findById(id: string): Promise<FlightRecord | null> {
   return prisma.flight.findUnique({ where: { id }, select: flightSelect });
+}
+
+// Cambia el avión solo si la versión sigue siendo la esperada; false si otra petición ya la cambió
+export async function setAircraft(id: string, aircraftIcao24: string | null, expectedVersion: number): Promise<boolean> {
+  const { count } = await prisma.flight.updateMany({
+    where: { id, version: expectedVersion },
+    data: { aircraftIcao24, version: { increment: 1 } },
+  });
+  return count === 1;
 }

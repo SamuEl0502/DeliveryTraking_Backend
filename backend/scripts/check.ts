@@ -11,6 +11,7 @@ import { isComplete } from '../services/flight.service.ts';
 import type { Flight } from '../types/flight.ts';
 import { createAssignmentBodySchema } from '../validators/assignment.validator.ts';
 import { createShipmentBodySchema } from '../validators/shipment.validator.ts';
+import { flightAircraftBodySchema, flightAircraftUnlinkBodySchema } from '../validators/flight.validator.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 
 // Prueba rápida del panel (geometría y elección del vuelo de Aviationstack): npm run check
@@ -167,6 +168,13 @@ const validVersion = (expectedFlightVersion: unknown) =>
 for (const v of [0, 1, 250]) assert.equal(validVersion(v), true, `version ${v}`);
 for (const v of [-1, 1.5, '1', undefined]) assert.equal(validVersion(v), false, `version ${v}`);
 
+// Asignar avión a un vuelo: icao24 de 6 hexadecimales (se pasa a minúsculas) y expectedVersion entero desde 0
+assert.equal(flightAircraftBodySchema.parse({ icao24: 'A39BFA', expectedVersion: 0 }).icao24, 'a39bfa');
+assert.equal(flightAircraftBodySchema.safeParse({ icao24: 'a39bfa', expectedVersion: 3 }).success, true);
+for (const body of [{ icao24: 'a39bf', expectedVersion: 0 }, { icao24: 'zzzzzz', expectedVersion: 0 }, { icao24: 'a39bfa', expectedVersion: -1 }, { icao24: 'a39bfa' }, { expectedVersion: 0 }])
+  assert.equal(flightAircraftBodySchema.safeParse(body).success, false, JSON.stringify(body));
+assert.equal(flightAircraftUnlinkBodySchema.safeParse({ expectedVersion: 2 }).success, true);
+assert.equal(flightAircraftUnlinkBodySchema.safeParse({ expectedVersion: '2' }).success, false);
 // Vuelos incompletos: sin indicativo o sin código IATA en un extremo, no se listan; sin avión sí (se asigna después)
 const airport = { iataCode: 'LAX', icaoCode: 'KLAX', name: 'LAX', city: 'Los Angeles', lat: 33.94, lng: -118.41, timezone: 'America/Los_Angeles' };
 const complete: Flight = {

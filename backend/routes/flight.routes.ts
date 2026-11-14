@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getFlight, listFlights } from '../controllers/flight.controller.ts';
+import { getFlight, listFlights, setFlightAircraft, unsetFlightAircraft } from '../controllers/flight.controller.ts';
 import { requireAuth, requireRole } from '../middlewares/auth.ts';
 import { validateParams } from '../middlewares/validate.ts';
 import { flightIdParamsSchema } from '../validators/flight.validator.ts';
@@ -11,3 +11,5 @@ flightRouter.use(requireAuth, requireRole('STAFF', 'ADMIN'));
 
 flightRouter.get('/', listFlights);
 flightRouter.get('/:id', validateParams(flightIdParamsSchema), getFlight);
+flightRouter.patch('/:id/aircraft', validateParams(flightIdParamsSchema), setFlightAircraft);
+flightRouter.delete('/:id/aircraft', validateParams(flightIdParamsSchema), unsetFlightAircraft);
