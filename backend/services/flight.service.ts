@@ -12,7 +12,7 @@ import type { AuthUser } from './token.service.ts';
 export async function list(query: FlightListQuery): Promise<FlightList> {
   const { minCapacityKg = 0, page, limit } = query;
   const records = await flightRepository.findMany(query);
-  const matching = records.map(toFlight).filter((f) => f.remainingCapacityKg >= minCapacityKg);
+  const matching = records.map(toFlight).filter(isComplete).filter((f) => f.remainingCapacityKg >= minCapacityKg);
 
   return {
     flights: matching.slice((page - 1) * limit, page * limit),
@@ -26,6 +26,11 @@ export async function getById(id: string): Promise<Flight> {
     throw new AppError(404, 'FLIGHT_NOT_FOUND', `No existe un vuelo con el id ${id}`);
   }
   return toFlight(record);
+}
+
+/** Vuelo con datos vitales: código IATA de origen y destino, e indicativo. El avión y la posición no cuentan: el Staff asigna el avión después (B2) y un vuelo programado aún no tiene posición */
+export function isComplete(f: Flight): boolean {
+  return Boolean(f.origin.iataCode && f.destination.iataCode && f.callsign);
 }
 
 // Se resta con Decimal, no con number, para que los pesos no acumulen errores de redondeo (0.1 + 0.2)
