@@ -37,6 +37,8 @@ const envSchema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
   //Capacidad estandar de Kg para todos los aviones
   DEFAULT_FLIGHT_CAPACITY_KG:z.coerce.number().min(1000).default(20000),
+  // Minutos después de la salida programada en que aún se aceptan envíos (vuelos con retraso en tierra)
+  ASSIGNMENT_GRACE_MINUTES: z.coerce.number().int().min(0).default(30),
 });
 
 // "PORT=" en el .env llega como texto vacío: lo tratamos como no definido para usar el default
