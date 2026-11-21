@@ -20,6 +20,7 @@ export interface ScheduledDeparture {
  */
 export type ScheduleSource = 'airlabs' | 'cache' | 'fixture';
 
+
 export interface ScheduleResponse {
   origin: string;
   destination: string;
@@ -30,4 +31,26 @@ export interface ScheduleResponse {
   /** Consultas reales hechas hoy a AirLabs (día UTC) */
   queriesToday: number;
   departures: ScheduledDeparture[];
+}
+
+export type FlightResult = 'exist' | 'new';
+
+export interface ImportedFlight {
+  flightId: string;
+  flightNumber: string;
+  departure: string;
+  result: FlightResult;
+}
+
+export interface ScheduleFlight {
+  origin: string;
+  destination: string;
+  source: ScheduleSource;
+  //contador de total de vuelos en esta ruta
+  totalFlight: number;
+  //contador de vuelos ya existentes en esta ruta
+  existFlight: number;
+  //contador de vuelos nuevos en esta ruta
+  newFlight: number;
+  flights: ImportedFlight[];
 }
