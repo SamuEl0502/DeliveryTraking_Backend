@@ -1,5 +1,6 @@
+import { env } from '../config/env.ts';
 import * as assignmentRepository from '../repositories/assignment.repository.ts';
-import type { LockedShipment } from '../repositories/assignment.repository.ts';
+import type { LockedFlight, LockedShipment } from '../repositories/assignment.repository.ts';
 import * as userRepository from '../repositories/user.repository.ts';
 import { AppError } from '../utils/AppError.ts';
 import type { CreateAssignmentInput } from '../validators/assignment.validator.ts';
@@ -29,6 +30,16 @@ function assertAssignable(shipment: LockedShipment): void {
   }
 }
 
+// Un vuelo sigue SCHEDULED aunque ya haya salido: se detecta porque el avión está en el aire o porque pasó la hora más la gracia
+function assertNotDeparted(flight: LockedFlight): void {
+  const graceMs = env.ASSIGNMENT_GRACE_MINUTES * 60_000;
+  const airborne = flight.lastKnownOnGround === false;
+  const overdue = Date.now() > flight.scheduledDeparture.getTime() + graceMs;
+  if (airborne || overdue) {
+    throw new AppError(400, 'FLIGHT_DEPARTED', 'El vuelo ya salió y no admite envíos');
+  }
+}
+
 // Cualquier error lanzado dentro de la transacción la revierte completa, incluidos los incrementos de version
 export async function assign(input: CreateAssignmentInput, actor: AuthUser): Promise<ShipmentDetail> {
   const { shipmentId, flightId, expectedFlightVersion } = input;
@@ -54,6 +65,7 @@ export async function assign(input: CreateAssignmentInput, actor: AuthUser): Pro
     if (flight.status !== 'SCHEDULED') {
       throw new AppError(400, 'FLIGHT_NOT_AVAILABLE', 'El vuelo ya no admite envíos');
     }
+    assertNotDeparted(flight);
     if (flight.originId !== shipment.originId || flight.destinationId !== shipment.destinationId) {
       throw new AppError(400, 'ROUTE_MISMATCH', 'La ruta del vuelo no coincide con la del envío');
     }
