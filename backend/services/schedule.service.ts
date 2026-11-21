@@ -1,10 +1,19 @@
 import type { Logger } from 'pino';
 import { env } from '../config/env.ts';
 import * as airlabs from '../providers/airlabs.provider.ts';
-import type { ScheduledDeparture, ScheduleResponse } from '../types/schedule.ts';
+import * as scheduleFlightRepository from '../repositories/scheduleFlight.repository.ts';
+import * as userRepository from '../repositories/user.repository.ts';
+import type { ImportedFlight, ScheduledDeparture, ScheduleFlight, ScheduleResponse } from '../types/schedule.ts';
 import { AppError } from '../utils/AppError.ts';
 import { TtlCache } from '../utils/ttlCache.ts';
 import type { ScheduleQuery } from '../validators/schedule.validator.ts';
+import type { AuthUser } from './token.service.ts';
+
+const HOUR_MS = 60 * 60 * 1000;
+// Dos salidas con el mismo número a menos de 6 horas se consideran el mismo vuelo
+const SAME_FLIGHT_MS = 6 * HOUR_MS;
+// Si la fuente no trae la llegada, se supone una duración de 2 horas
+const DEFAULT_DURATION_MS = 2 * HOUR_MS;
 
 // Se guarda la lista completa de la ruta; la ventana de minutos se filtra en cada petición
 interface CachedRoute {
@@ -75,5 +84,93 @@ export async function getDepartures(query: ScheduleQuery, log: Logger): Promise<
     source: !fresh ? 'cache' : env.USE_FIXTURE ? 'fixture' : 'airlabs',
     queriesToday: queriesToday(),
     departures: inWindow(route.departures, Date.now(), minutes),
+  };
+}
+
+// Busca el id de un aeropuerto por su código; si no está en la base, avisa cuál falta
+async function findAirportIds(origin: string, destination: string): Promise<{ originId: string; destinationId: string }> {
+  const airports = await scheduleFlightRepository.coincidesAirports([origin, destination]);
+  const originAirport = airports.find((a) => a.iataCode === origin);
+  const destinationAirport = airports.find((a) => a.iataCode === destination);
+  if (!originAirport) {
+    throw new AppError(400, 'AIRPORT_NOT_SUPPORTED', `El aeropuerto ${origin} no está registrado en el sistema`);
+  }
+  if (!destinationAirport) {
+    throw new AppError(400, 'AIRPORT_NOT_SUPPORTED', `El aeropuerto ${destination} no está registrado en el sistema`);
+  }
+  return { originId: originAirport.id, destinationId: destinationAirport.id };
+}
+
+// Guarda como vuelos las salidas reales de la ruta. Solo inserta: un vuelo que ya existe no se toca
+export async function importDepartures(user: AuthUser, body: ScheduleQuery, log: Logger): Promise<ScheduleFlight> {
+  if (env.USE_FIXTURE) {
+    throw new AppError(400, 'IMPORT_NOT_AVAILABLE', 'Solo se importan salidas reales; el modo de ejemplo está activo');
+  }
+
+  const { originId, destinationId } = await findAirportIds(body.origin, body.destination);
+
+  // El aeropuerto del Staff se lee de la base porque no viaja en el token
+  if (user.role === 'STAFF') {
+    const staff = await userRepository.findById(user.id);
+    if (staff?.airportId !== originId) {
+      throw new AppError(403, 'FORBIDDEN_AIRPORT', 'Solo puedes importar vuelos que salen de tu aeropuerto');
+    }
+  }
+
+  // Reutiliza la caché: si la ruta ya se consultó, no se gasta otra consulta
+  const schedule = await getDepartures(body, log);
+
+  const flights: ImportedFlight[] = [];
+  let existFlight = 0;
+  let newFlight = 0;
+
+  for (const departure of schedule.departures) {
+    const departureDate = new Date(departure.scheduledDeparture);
+    const near = await scheduleFlightRepository.findFlightBetween(
+      departure.flightIata,
+      new Date(departureDate.getTime() - SAME_FLIGHT_MS),
+      new Date(departureDate.getTime() + SAME_FLIGHT_MS),
+    );
+
+    if (near) {
+      existFlight += 1;
+      flights.push({
+        flightId: near.id,
+        flightNumber: near.flightNumber,
+        departure: near.scheduledDeparture.toISOString(),
+        result: 'exist',
+      });
+      continue;
+    }
+
+    const created = await scheduleFlightRepository.createFlight({
+      flightNumber: departure.flightIata,
+      callsign: departure.flightIcao ?? departure.flightIata,
+      originId,
+      destinationId,
+      scheduledDeparture: departureDate,
+      scheduledArrival: departure.scheduledArrival
+        ? new Date(departure.scheduledArrival)
+        : new Date(departureDate.getTime() + DEFAULT_DURATION_MS),
+      capacityKg: env.DEFAULT_FLIGHT_CAPACITY_KG,
+    });
+    newFlight += 1;
+    flights.push({
+      flightId: created.id,
+      flightNumber: created.flightNumber,
+      departure: created.scheduledDeparture.toISOString(),
+      result: 'new',
+    });
+  }
+
+  log.info({ origin: body.origin, destination: body.destination, existFlight, newFlight }, 'Schedule import');
+  return {
+    origin: body.origin,
+    destination: body.destination,
+    source: schedule.source,
+    totalFlight: flights.length,
+    existFlight,
+    newFlight,
+    flights,
   };
 }

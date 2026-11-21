@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import * as scheduleService from '../services/schedule.service.ts';
-import type { ScheduleResponse } from '../types/schedule.ts';
+import type { ScheduleFlight, ScheduleResponse } from '../types/schedule.ts';
 import { AppError } from '../utils/AppError.ts';
 import { scheduleQuerySchema } from '../validators/schedule.validator.ts';
 
@@ -11,4 +11,16 @@ export async function getSchedules(req: Request, res: Response<ScheduleResponse>
     throw new AppError(400, 'VALIDATION_ERROR', query.error.issues.map((i) => i.message).join('; '));
   }
   res.json(await scheduleService.getDepartures(query.data, req.log));
+}
+
+// Igual que getSchedules, pero los datos vienen en el cuerpo y hace falta saber quién importa
+export async function importSchedules(req: Request, res: Response<ScheduleFlight>): Promise<void> {
+  if (!req.user) {
+    throw new AppError(401, 'UNAUTHORIZED', 'Debes iniciar sesión');
+  }
+  const body = scheduleQuerySchema.safeParse(req.body);
+  if (!body.success) {
+    throw new AppError(400, 'VALIDATION_ERROR', body.error.issues.map((i) => i.message).join('; '));
+  }
+  res.status(200).json(await scheduleService.importDepartures(req.user, body.data, req.log));
 }
