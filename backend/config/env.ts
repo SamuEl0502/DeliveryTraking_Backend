@@ -35,6 +35,8 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, 'debe tener al menos 32 caracteres'),
   ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
+  //Capacidad estandar de Kg para todos los aviones
+  DEFAULT_FLIGHT_CAPACITY_KG:z.coerce.number().min(1000).default(20000),
 });
 
 // "PORT=" en el .env llega como texto vacío: lo tratamos como no definido para usar el default
