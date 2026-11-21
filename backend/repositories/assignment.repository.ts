@@ -34,6 +34,8 @@ const lockedFlightSelect = {
   capacityKg: true,
   originId: true,
   destinationId: true,
+  scheduledDeparture: true,
+  lastKnownOnGround: true,
 } satisfies Prisma.FlightSelect;
 
 export type LockedFlight = Prisma.FlightGetPayload<{ select: typeof lockedFlightSelect }>;
