@@ -2,6 +2,7 @@ import type { Logger } from 'pino';
 import * as watcherRepository from '../repositories/flightWatcher.repository.ts';
 import type { WatchedFlight } from '../repositories/flightWatcher.repository.ts';
 import { peekUsAircraft } from '../services/aircraft.service.ts';
+import { findByCallsign } from '../services/tracking.service.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 
 const INTERVAL_MS = 60_000;
@@ -13,6 +14,12 @@ const TAKEOFF_LATE_MS = 6 * 60 * 60_000;
 
 export type Transition = 'takeoff' | 'landing' | null;
 
+// Misma ventana para vincular el avión y para detectar el despegue
+function inTakeoffWindow(scheduledDeparture: Date, now: number): boolean {
+  const departure = scheduledDeparture.getTime();
+  return now >= departure - TAKEOFF_EARLY_MS && now <= departure + TAKEOFF_LATE_MS;
+}
+
 /** Qué cambio toca según la posición del avión; null si ninguno o si no hay posición reciente */
 export function nextTransition(
   f: Pick<WatchedFlight, 'status' | 'scheduledDeparture'>,
@@ -20,18 +27,35 @@ export function nextTransition(
   now: number,
 ): Transition {
   if (!a || now - a.ts * 1000 > MAX_POSITION_AGE_MS) return null;
-  const departure = f.scheduledDeparture.getTime();
-  const inWindow = now >= departure - TAKEOFF_EARLY_MS && now <= departure + TAKEOFF_LATE_MS;
+  const inWindow = inTakeoffWindow(f.scheduledDeparture, now);
   if (f.status === 'SCHEDULED' && !a.onGround && inWindow) return 'takeoff';
   if (f.status === 'DEPARTED' && a.onGround) return 'landing';
   return null;
 }
 
-/** Un ciclo: cruza los vuelos vigilados con la caché de OpenSky. Repetirlo no duplica nada */
+// Vincula el avión por indicativo a los vuelos programados sin avión que salen dentro de la ventana. Un fallo aquí no frena los despegues
+async function linkByCallsign(log: Logger, aircraft: AircraftState[], now: number): Promise<void> {
+  try {
+    for (const f of await watcherRepository.findUnlinked()) {
+      if (!inTakeoffWindow(f.scheduledDeparture, now)) continue;
+      const a = findByCallsign(aircraft, f.callsign);
+      if (!a) continue;
+      // false: otro cambió el vuelo antes (o ya tiene avión); no se pisa nada
+      if (await watcherRepository.linkAircraft(f, a.icao24)) {
+        log.info({ flightId: f.id, flightNumber: f.flightNumber, callsign: f.callsign, icao24: a.icao24 }, 'flight watcher: avión vinculado por indicativo');
+      }
+    }
+  } catch (err) {
+    log.error({ err }, 'flight watcher link failed');
+  }
+}
+
+/** Un ciclo: vincula aviones por indicativo y cruza los vuelos vigilados con la caché de OpenSky. Repetirlo no duplica nada */
 export async function checkFlights(log: Logger, now = Date.now()): Promise<void> {
   // Solo la caché del mapa: el job nunca gasta créditos de OpenSky
   const snapshot = peekUsAircraft();
   if (!snapshot) return;
+  await linkByCallsign(log, snapshot.aircraft, now);
   const byIcao = new Map(snapshot.aircraft.map((a) => [a.icao24, a]));
 
   for (const f of await watcherRepository.findWatched()) {
