@@ -8,6 +8,8 @@ const publicUserSelect = {
   name: true,
   role: true,
   airportId: true,
+  // Aeropuerto del Staff: el frontend lo usa como origen sin pedirlo
+  airport: { select: { iataCode: true, name: true } },
 } satisfies Prisma.UserSelect;
 
 export type UserRecord = Prisma.UserGetPayload<{ select: typeof publicUserSelect }>;
