@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getSchedules } from '../controllers/schedule.controller.ts';
+import { getSchedules, importSchedules } from '../controllers/schedule.controller.ts';
 import { requireAuth, requireRole } from '../middlewares/auth.ts';
 
 export const scheduleRouter = Router();
@@ -8,3 +8,5 @@ export const scheduleRouter = Router();
 scheduleRouter.use(requireAuth, requireRole('STAFF', 'ADMIN'));
 
 scheduleRouter.get('/', getSchedules);
+// Guarda las salidas de la ruta como vuelos (solo inserta los nuevos)
+scheduleRouter.post('/import', importSchedules);
