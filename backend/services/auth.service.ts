@@ -14,6 +14,8 @@ export interface PublicUser {
   name: string;
   role: Role;
   airportId: string | null;
+  // Aeropuerto del Staff (null para admin y clientes)
+  airport: { iataCode: string; name: string } | null;
 }
 
 // Respuesta de register, login y refresh. El refresh token no va aquí: viaja en la cookie
@@ -107,7 +109,14 @@ async function createSession(user: UserRecord): Promise<AuthSession> {
 }
 
 function toPublicUser(u: UserRecord): PublicUser {
-  return { id: u.id, email: u.email, name: u.name, role: u.role, airportId: u.airportId };
+  return {
+    id: u.id,
+    email: u.email,
+    name: u.name,
+    role: u.role,
+    airportId: u.airportId,
+    airport: u.airport && { iataCode: u.airport.iataCode, name: u.airport.name },
+  };
 }
 
 function emailTaken(): AppError {
