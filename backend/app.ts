@@ -13,6 +13,7 @@ import { authRouter } from './routes/auth.routes.ts';
 import { flightRouter } from './routes/flight.routes.ts';
 import { assignmentRouter } from './routes/assignment.routes.ts';
 import { trackingRouter } from './routes/tracking.routes.ts';
+import { scheduleRouter } from './routes/schedule.routes.ts';
 
 export const app = express();
 
@@ -36,6 +37,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/flights', flightRouter);
 app.use('/api/tracking', trackingRouter);
 app.use('/api/assignments', assignmentRouter);
+app.use('/api/schedules', scheduleRouter);
 
 // Siempre al final: 404 y luego el manejador global de errores
 app.use(notFound);
