@@ -27,10 +27,23 @@ export async function getByTrackingCode(trackingCode: string, log: Logger): Prom
   };
 }
 
+const normalizeCallsign = (c: string | null | undefined): string => c?.trim().toUpperCase() ?? '';
+
+/** Avión de la lista cuyo indicativo coincide con el del vuelo, sin importar mayúsculas ni espacios en los extremos */
+export function findByCallsign(aircraft: AircraftState[], callsign: string | null | undefined): AircraftState | undefined {
+  const wanted = normalizeCallsign(callsign);
+  if (!wanted) return undefined;
+  return aircraft.find((a) => normalizeCallsign(a.callsign) === wanted);
+}
+
 // Solo la lista de EE. UU. que ya comparte el mapa: un envío consultado no gasta créditos extra por avión
-async function findLive(flight: { aircraftIcao24: string | null } | null, log: Logger): Promise<LiveResult> {
+async function findLive(flight: { aircraftIcao24: string | null; callsign: string | null } | null, log: Logger): Promise<LiveResult> {
   if (!flight) return { live: null, reason: 'no_flight' };
-  if (!flight.aircraftIcao24) return { live: null, reason: 'no_aircraft' };
+  if (!flight.aircraftIcao24) {
+    // Sin avión vinculado: se busca por indicativo en la caché, sin pedir nada a OpenSky ni guardar nada
+    const match = findByCallsign(aircraftService.peekUsAircraft()?.aircraft ?? [], flight.callsign);
+    return match ? liveFrom(match.icao24, [match]) : { live: null, reason: 'no_aircraft' };
+  }
   try {
     return liveFrom(flight.aircraftIcao24, (await aircraftService.getUsAircraft(log)).aircraft);
   } catch (err) {

@@ -26,6 +26,33 @@ export function findWatched(): Promise<WatchedFlight[]> {
   });
 }
 
+const unlinkedSelect = {
+  id: true,
+  flightNumber: true,
+  callsign: true,
+  scheduledDeparture: true,
+  version: true,
+} satisfies Prisma.FlightSelect;
+
+export type UnlinkedFlight = Prisma.FlightGetPayload<{ select: typeof unlinkedSelect }>;
+
+/** Vuelos programados con indicativo pero sin avión: candidatos a vincularse solos */
+export function findUnlinked(): Promise<UnlinkedFlight[]> {
+  return prisma.flight.findMany({
+    where: { status: 'SCHEDULED', aircraftIcao24: null, callsign: { not: null } },
+    select: unlinkedSelect,
+  });
+}
+
+/** Guarda el avión solo si el vuelo sigue en la versión leída y sin avión; false si otro lo cambió antes */
+export async function linkAircraft(f: UnlinkedFlight, icao24: string): Promise<boolean> {
+  const { count } = await prisma.flight.updateMany({
+    where: { id: f.id, version: f.version, aircraftIcao24: null },
+    data: { aircraftIcao24: icao24, version: { increment: 1 } },
+  });
+  return count === 1;
+}
+
 // Cambia el estado solo si el vuelo sigue en la versión y el estado leídos: así un segundo ciclo, otro proceso o un cambio del Staff no lo repiten ni lo pisan
 async function transition(tx: Tx, f: WatchedFlight, from: FlightStatus, to: FlightStatus, a: AircraftState): Promise<boolean> {
   const { count } = await tx.flight.updateMany({
