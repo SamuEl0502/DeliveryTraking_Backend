@@ -97,6 +97,15 @@ export interface NewShipment {
   flightId: string;
 }
 
+export interface NewManualShipment {
+  trackingCode: string;
+  description: string;
+  weightKg: number;
+  ownerId: string;
+  originId: string;
+  destinationId: string;
+}
+
 export interface FlightAvailability {
   status: FlightStatus;
   availableKg: Prisma.Decimal;
@@ -132,4 +141,15 @@ export function createOnFlight(
       select: shipmentSelect,
     });
   });
+}
+
+export function createUnassigned(shipment:NewManualShipment):Promise<ShipmentRecord>{
+  return prisma.shipment.create({
+    data:{
+      ...shipment,
+      events:{create: { type: 'RECEIVED', airportId: shipment.originId } }
+    },
+    select: shipmentSelect,
+  }
+  )
 }
