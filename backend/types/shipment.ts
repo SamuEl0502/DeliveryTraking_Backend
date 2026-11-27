@@ -42,3 +42,12 @@ export interface ShipmentList {
   shipments: ShipmentSummary[];
   pagination: FlightList['pagination'];
 }
+
+//Peticion POST para agregar un nuevo envio
+export interface CreateManualShipmentRequest {
+  ownerEmail:string;
+  description:string;
+  weightKg:number;
+  origin?:string;
+  destination:string;
+}
