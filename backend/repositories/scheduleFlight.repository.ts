@@ -12,6 +12,10 @@ export async function coincidesAirports(IATACodes: string[]):Promise<airports[]>
     return prisma.airport.findMany({where: {iataCode:{in: IATACodes}}, select:airportIdSelect});
 }
 
+export async function findByIATACode(IATACode: string):Promise<airports | null>{
+    return prisma.airport.findFirst({where: {iataCode:IATACode}, select:airportIdSelect});
+}
+
 // De cada vuelo solo hace falta lo que se devuelve en la importación
 export const importedFlightSelect = {
   id: true,
