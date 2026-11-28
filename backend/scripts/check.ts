@@ -8,7 +8,7 @@ import { byAirline, takeoffOf } from '../services/aircraft.service.ts';
 import { parseAirports, splitCsvLine } from '../providers/airportDb.provider.ts';
 import { bearingDeg, computeProgress, distanceKm, nearestAirport } from '../services/flightDetails.service.ts';
 import { isComplete } from '../services/flight.service.ts';
-import { liveFrom } from '../services/tracking.service.ts';
+import { findLive, liveFrom } from '../services/tracking.service.ts';
 import { nextTransition } from '../jobs/flightWatcher.ts';
 import type { Flight } from '../types/flight.ts';
 import { createAssignmentBodySchema } from '../validators/assignment.validator.ts';
@@ -212,6 +212,30 @@ assert.equal(nextTransition(watched('DEPARTED'), { ...fresh(true), ts: nowMs / 1
 // El avión vuela otro tramo: el vuelo sale mañana o salía hace 2 días
 assert.equal(nextTransition(watched('SCHEDULED', '2026-11-14T10:00:00Z'), fresh(false), nowMs), null);
 assert.equal(nextTransition(watched('SCHEDULED', '2026-11-11T10:00:00Z'), fresh(false), nowMs), null);
+// Envío sin avión vinculado: en la ventana se consulta con getUsAircraft; fuera de ella solo se mira la caché
+let loads = 0;
+const source = {
+  async getUsAircraft() {
+    loads++;
+    return { time: nowMs / 1000, aircraft: [fresh(false)] };
+  },
+  peekUsAircraft: () => undefined,
+};
+const unlinked = (status: Flight['status'], departure = '2026-11-13T09:50:00Z') => ({
+  aircraftIcao24: null, callsign: 'ual1855 ', status, scheduledDeparture: new Date(departure),
+});
+const liveOf = (f: ReturnType<typeof unlinked>, from: Parameters<typeof findLive>[2] = source) => findLive(f, silent, from, nowMs);
+for (const f of [unlinked('SCHEDULED'), unlinked('DEPARTED', '2026-11-11T10:00:00Z')]) {
+  loads = 0;
+  assert.equal((await liveOf(f)).live?.lat, 40);
+  assert.equal(loads, 1);
+}
+loads = 0;
+for (const f of [unlinked('SCHEDULED', '2026-11-14T10:00:00Z'), unlinked('SCHEDULED', '2026-11-13T03:00:00Z'), unlinked('LANDED')])
+  assert.deepEqual(await liveOf(f), { live: null, reason: 'no_aircraft' });
+assert.equal(loads, 0);
+const down = { ...source, getUsAircraft: () => Promise.reject(new Error('caída')) };
+assert.deepEqual(await liveOf(unlinked('SCHEDULED'), down), { live: null, reason: 'source_unavailable' });
 // peek devuelve lo guardado aunque esté vencido, sin cargar
 const peekCache = new TtlCache<number>(0);
 assert.equal(peekCache.peek('k'), undefined);
