@@ -9,15 +9,25 @@ import * as aircraftService from './aircraft.service.ts';
 import type { AuthUser } from './token.service.ts';
 
 // shortcut: minCapacityKg y la paginación se aplican en memoria porque la capacidad restante se calcula con los envíos; pasar a SQL si hay miles de vuelos
-export async function list(query: FlightListQuery): Promise<FlightList> {
+export async function list(query: FlightListQuery, actor: AuthUser): Promise<FlightList> {
   const { minCapacityKg = 0, page, limit } = query;
-  const records = await flightRepository.findMany(query);
+  const records = await flightRepository.findMany({ ...query, airportId: await listScope(actor) });
   const matching = records.map(toFlight).filter(isComplete).filter((f) => f.remainingCapacityKg >= minCapacityKg);
 
   return {
     flights: matching.slice((page - 1) * limit, page * limit),
     pagination: { page, limit, total: matching.length, totalPages: Math.ceil(matching.length / limit) },
   };
+}
+
+// Staff solo ve vuelos que salen de su aeropuerto o llegan a él; undefined (Admin) no filtra
+async function listScope(actor: AuthUser): Promise<string | undefined> {
+  if (actor.role === 'ADMIN') return undefined;
+  const user = await userRepository.findById(actor.id);
+  if (!user?.airportId) {
+    throw new AppError(403, 'FORBIDDEN_AIRPORT', 'No tienes un aeropuerto asignado');
+  }
+  return user.airportId;
 }
 
 export async function getById(id: string): Promise<Flight> {

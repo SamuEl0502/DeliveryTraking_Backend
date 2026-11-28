@@ -17,6 +17,10 @@ export const flightListQuerySchema = z.object({
     .number('minCapacityKg debe ser un número')
     .min(0, 'minCapacityKg no puede ser negativo')
     .optional(),
+  // true: solo vuelos con al menos un envío. No se usa z.coerce.boolean porque convierte 'false' en true
+  withShipments: z
+    .stringbool({ truthy: ['true'], falsy: ['false'], error: 'withShipments debe ser true o false' })
+    .optional(),
   page: z.coerce
     .number('page debe ser un número')
     .int('page debe ser un entero')
