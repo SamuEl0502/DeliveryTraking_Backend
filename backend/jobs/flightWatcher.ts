@@ -4,21 +4,13 @@ import type { WatchedFlight } from '../repositories/flightWatcher.repository.ts'
 import { peekUsAircraft } from '../services/aircraft.service.ts';
 import { findByCallsign } from '../services/tracking.service.ts';
 import type { AircraftState } from '../types/aircraft.ts';
+import { inTakeoffWindow } from '../utils/takeoffWindow.ts';
 
 const INTERVAL_MS = 60_000;
 // Si el mapa dejó de refrescar la caché, la posición vieja no sirve para decidir
 const MAX_POSITION_AGE_MS = 2 * 60_000;
-// El avión asignado puede volar otro tramo antes o después: solo cuenta el despegue cerca de la hora programada
-const TAKEOFF_EARLY_MS = 60 * 60_000;
-const TAKEOFF_LATE_MS = 6 * 60 * 60_000;
 
 export type Transition = 'takeoff' | 'landing' | null;
-
-// Misma ventana para vincular el avión y para detectar el despegue
-function inTakeoffWindow(scheduledDeparture: Date, now: number): boolean {
-  const departure = scheduledDeparture.getTime();
-  return now >= departure - TAKEOFF_EARLY_MS && now <= departure + TAKEOFF_LATE_MS;
-}
 
 /** Qué cambio toca según la posición del avión; null si ninguno o si no hay posición reciente */
 export function nextTransition(
