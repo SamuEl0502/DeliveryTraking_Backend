@@ -35,10 +35,16 @@ export interface FlightFilters {
   destination?: string | undefined;
   /** Día de salida en UTC, AAAA-MM-DD */
   date?: string | undefined;
+  /** Vuelos que salen de este aeropuerto o llegan a él */
+  airportId?: string | undefined;
+  /** Solo vuelos con al menos un envío */
+  withShipments?: boolean | undefined;
 }
 
-export function findMany({ origin, destination, date }: FlightFilters): Promise<FlightRecord[]> {
+export function findMany({ origin, destination, date, airportId, withShipments }: FlightFilters): Promise<FlightRecord[]> {
   const where: Prisma.FlightWhereInput = {};
+  if (airportId) where.OR = [{ originId: airportId }, { destinationId: airportId }];
+  if (withShipments) where.shipments = { some: {} };
   if (origin) where.origin = { iataCode: origin };
   if (destination) where.destination = { iataCode: destination };
   if (date) {

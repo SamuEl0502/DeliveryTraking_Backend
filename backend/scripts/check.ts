@@ -13,7 +13,7 @@ import { nextTransition } from '../jobs/flightWatcher.ts';
 import type { Flight } from '../types/flight.ts';
 import { createAssignmentBodySchema } from '../validators/assignment.validator.ts';
 import { createShipmentBodySchema } from '../validators/shipment.validator.ts';
-import { flightAircraftBodySchema, flightAircraftUnlinkBodySchema } from '../validators/flight.validator.ts';
+import { flightAircraftBodySchema, flightAircraftUnlinkBodySchema, flightListQuerySchema } from '../validators/flight.validator.ts';
 import type { AircraftState } from '../types/aircraft.ts';
 
 // Prueba rápida del panel (geometría y elección del vuelo de Aviationstack): npm run check
@@ -177,6 +177,16 @@ for (const body of [{ icao24: 'a39bf', expectedVersion: 0 }, { icao24: 'zzzzzz',
   assert.equal(flightAircraftBodySchema.safeParse(body).success, false, JSON.stringify(body));
 assert.equal(flightAircraftUnlinkBodySchema.safeParse({ expectedVersion: 2 }).success, true);
 assert.equal(flightAircraftUnlinkBodySchema.safeParse({ expectedVersion: '2' }).success, false);
+// Listado de vuelos: withShipments llega como texto; sin él no se filtra, y 'false' no puede quedar en true
+assert.equal(flightListQuerySchema.parse({}).withShipments, undefined);
+assert.equal(flightListQuerySchema.parse({ withShipments: 'true' }).withShipments, true);
+assert.equal(flightListQuerySchema.parse({ withShipments: 'false' }).withShipments, false);
+for (const v of ['1', 'si', '', ['true', 'false']]) {
+  const result = flightListQuerySchema.safeParse({ withShipments: v });
+  assert.equal(result.error?.issues[0]?.message, 'withShipments debe ser true o false', JSON.stringify(v));
+}
+// airportId sale de la base según el rol: si llega en la URL se descarta
+assert.equal('airportId' in flightListQuerySchema.parse({ airportId: uuid }), false);
 // Vuelos incompletos: sin indicativo o sin código IATA en un extremo, no se listan; sin avión sí (se asigna después)
 const airport = { iataCode: 'LAX', icaoCode: 'KLAX', name: 'LAX', city: 'Los Angeles', lat: 33.94, lng: -118.41, timezone: 'America/Los_Angeles' };
 const complete: Flight = {

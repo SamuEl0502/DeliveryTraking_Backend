@@ -15,7 +15,7 @@ export async function listFlights(req: Request, res: Response<FlightList>): Prom
   if (!query.success) {
     throw new AppError(400, 'VALIDATION_ERROR', query.error.issues.map((i) => i.message).join('; '));
   }
-  res.json(await flightService.list(query.data));
+  res.json(await flightService.list(query.data, actorOf(req)));
 }
 
 export async function getFlight(req: Request<{ id: string }>, res: Response<Flight>): Promise<void> {

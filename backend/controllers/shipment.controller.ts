@@ -65,5 +65,7 @@ export async function listShipments(req: Request, res: Response<ShipmentList>): 
 
 // Vuelos que el cliente puede elegir al crear un envío; de aquí obtiene el flightId
 export async function listAvailableFlights(req: Request, res: Response<AvailableFlightList>): Promise<void> {
-  res.json(await shipmentService.listAvailableFlights(parse(flightListQuerySchema, req.query)));
+  // El cliente no puede filtrar por envíos: es un dato de operación
+  const query = parse(flightListQuerySchema.omit({ withShipments: true }), req.query);
+  res.json(await shipmentService.listAvailableFlights(query));
 }
