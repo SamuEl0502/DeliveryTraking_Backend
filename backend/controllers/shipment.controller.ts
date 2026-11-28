@@ -7,6 +7,7 @@ import { AppError } from '../utils/AppError.ts';
 import { flightListQuerySchema } from '../validators/flight.validator.ts';
 import {
   createShipmentBodySchema,
+  createManualShipmentBodySchema,
   myShipmentsQuerySchema,
   shipmentListQuerySchema,
 } from '../validators/shipment.validator.ts';
@@ -35,6 +36,15 @@ export async function createShipment(req: Request, res: Response<ShipmentDetail>
   }
   const input = parse(createShipmentBodySchema, req.body);
   res.status(201).json(await shipmentService.create(input, req.user.id));
+}
+
+// El dueño es el cliente y quien lo crea puede ser el Staff o el Admin, y su identidad sale del token, y el rol varia depende del origen del paquete
+export async function createManualShipment(req: Request, res: Response<ShipmentDetail>): Promise<void> {
+  if (!req.user) {
+    throw new AppError(401, 'UNAUTHORIZED', 'Debes iniciar sesión');
+  }
+  const input = parse(createManualShipmentBodySchema, req.body);
+  res.status(201).json(await shipmentService.createManual(input, req.user));
 }
 
 // Envíos del usuario del token; nunca de un id que llegue en la URL

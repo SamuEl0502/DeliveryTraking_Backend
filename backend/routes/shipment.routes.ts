@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   createShipment,
+  createManualShipment,
   getMyShipments,
   getShipment,
   listAvailableFlights,
@@ -14,6 +15,7 @@ export const shipmentRouter = Router();
 
 shipmentRouter.get('/', requireAuth, requireRole('STAFF', 'ADMIN'), listShipments);
 shipmentRouter.post('/', requireAuth, requireRole('CLIENT'), createShipment);
+shipmentRouter.post('/manual', requireAuth, requireRole('STAFF', 'ADMIN'), createManualShipment);
 // Antes de /:trackingCode, que también coincidiría con estas rutas
 shipmentRouter.get('/available-flights', requireAuth, requireRole('CLIENT'), listAvailableFlights);
 shipmentRouter.get('/mine', requireAuth, getMyShipments);

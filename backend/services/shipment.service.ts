@@ -2,13 +2,14 @@ import { randomInt } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import type { FlightStatus, ShipmentStatus, TrackingEventType } from '@prisma/client';
 import * as flightRepository from '../repositories/flight.repository.ts';
+import * as scheduleFlightRepository from '../repositories/scheduleFlight.repository.ts';
 import * as shipmentRepository from '../repositories/shipment.repository.ts';
 import * as userRepository from '../repositories/user.repository.ts';
 import type { FlightAvailability, ShipmentRecord, ShipmentSummaryRecord } from '../repositories/shipment.repository.ts';
 import type { AvailableFlightList, ShipmentList } from '../types/shipment.ts';
 import { AppError } from '../utils/AppError.ts';
 import type { FlightListQuery } from '../validators/flight.validator.ts';
-import type { CreateShipmentInput, MyShipmentsQuery, ShipmentListQuery } from '../validators/shipment.validator.ts';
+import type { CreateShipmentInput, createManualShipmentInput, MyShipmentsQuery, ShipmentListQuery } from '../validators/shipment.validator.ts';
 import { toFlight } from './flight.service.ts';
 import type { AuthUser } from './token.service.ts';
 
@@ -115,6 +116,86 @@ export async function create(input: CreateShipmentInput, ownerId: string): Promi
       if (!shipment) {
         throw new AppError(404, 'FLIGHT_NOT_FOUND', `No existe un vuelo con el id ${input.flightId}`);
       }
+      return toDetail(shipment);
+    } catch (err) {
+      // El único campo único que se genera aquí es trackingCode: si ya existe, se prueba con otro
+      const repeatedCode = err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+      if (!repeatedCode || attempt === TRACKING_CODE_ATTEMPTS) throw err;
+    }
+  }
+}
+
+export async function createManual(input: createManualShipmentInput, actor: AuthUser):Promise<ShipmentDetail>{
+  const { description, weightKg, ownerEmail, destination} = input;
+  const owner = await userRepository.findByEmail(ownerEmail);
+  const destinationObject = await scheduleFlightRepository.findByIATACode(destination);
+
+  let originId: string | null;
+
+  switch(actor.role){
+    case "ADMIN":{
+      let originObject : scheduleFlightRepository.airports | null;
+      const {origin} = input;
+
+      if(origin === undefined){
+      throw new AppError(400, 'ORIGIN_REQUIRED', 'por favor ingrese un aeropuerto de origen')
+      }
+
+      originObject = await scheduleFlightRepository.findByIATACode(origin);
+
+      if(originObject === null){
+        throw new AppError(404, 'AIRPORT_NOT_FOUND', 'el origen no existe')
+      }
+
+      originId = originObject.id;
+    
+      break;
+    }
+    case "STAFF":{
+      const actorObject = await userRepository.findById(actor.id);
+
+      if(actorObject === null){
+        throw new AppError(404, 'STAFF_NOT_FOUND', 'No se encontro este usuario STAFF');
+      }
+
+      originId = actorObject.airportId;
+
+      if(originId === null){
+        throw new AppError(403, 'FORBIDDEN_AIRPORT', 'No tiene un aeropuerto asignado');
+      }
+
+      break;
+    }
+
+    case "CLIENT": {throw new AppError(403, 'FORBIDDEN', 'No tienes permiso de crear envios');}
+  }
+  
+
+  if(owner === null){
+    throw new AppError(404, 'OWNER_NOT_FOUND', 'el dueño del envio no existe')
+  }
+
+  if(owner.role !== "CLIENT"){
+    throw new AppError(403, 'OWNER_NOT_CLIENT', 'el dueño del envio debe ser un cliente')
+  }
+
+  if(destinationObject === null){
+    throw new AppError(404, 'AIRPORT_NOT_FOUND', 'el aeropuerto de destino no existe')
+  }
+
+  const ownerId = owner.id
+  
+  const destinationId = destinationObject.id;
+
+  if(destinationId === originId){
+    throw new AppError(400, 'SAME_AIRPORT', 'el aeropuerto de destino no puede ser igual que el de origen')
+  }
+
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const shipment = await shipmentRepository.createUnassigned(
+        { trackingCode: generateTrackingCode(), description, weightKg, ownerId, originId, destinationId},
+      );
       return toDetail(shipment);
     } catch (err) {
       // El único campo único que se genera aquí es trackingCode: si ya existe, se prueba con otro

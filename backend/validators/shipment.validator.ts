@@ -56,3 +56,36 @@ export const shipmentListQuerySchema = z.object({
 });
 
 export type ShipmentListQuery = z.infer<typeof shipmentListQuerySchema>;
+
+//Filtros de los datos ingresado para crear un envío
+export const createManualShipmentBodySchema = z.object({
+  ownerEmail:z
+  .email("Ingrese un correo valido"),
+
+  description:z 
+  .string("La descripcion debe ser un texto")
+  .trim()
+  .min(1,"La descripcion no puede estar vacía")
+  .max(200,"La descripcion debe tener 200 o menos caracteres"),
+
+  weightKg:z
+  .number("El peso debe ser un numero")
+  .positive("El peso del envío debe ser mayor que 0")
+  .max(999999.99, 'weightKg no puede ser mayor que 999999.99')
+  .multipleOf(0.01, 'weightKg admite hasta 2 decimales'),
+
+  origin:z
+  .string("El origen tiene que ser un texto")
+  .trim()
+  .length(3,"el origen debe tener exactamente 3 caracteres")
+  .transform((v) => v.toUpperCase())
+  .optional(),
+
+  destination:z
+  .string("El destino tiene que ser un texto")
+  .trim()
+  .length(3,"el destino debe tener exactamente 3 caracteres")
+  .transform((v) => v.toUpperCase())
+});
+
+export type createManualShipmentInput = z.infer<typeof createManualShipmentBodySchema>;
